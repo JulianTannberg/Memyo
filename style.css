@@ -251,7 +251,7 @@ a{color:inherit}
 
 .pips{
   position: fixed;
-  right: 130px;
+  right: 150px;
   bottom: 25px;
   width: 72px;
   height: auto;
@@ -262,7 +262,7 @@ a{color:inherit}
 @media (max-width:768px){
   .pips{
     right: 75px;
-    bottom: 30px;
+    bottom: 40px;
     width: 58px;
   }
 }
