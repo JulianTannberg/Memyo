@@ -246,22 +246,12 @@ a{color:inherit}
 .site-footer a:hover{color:var(--memyo-blue)}
 
 .pips{
-  position:fixed;
-  right:18px;
-  bottom:18px;
-  width:86px;
-  z-index:900;
-}
-.chat-placeholder{
-  position:fixed;
-  right:114px;
-  bottom:26px;
-  background:#fff;
-  border-radius:20px;
-  box-shadow:0 4px 14px rgba(0,0,0,.10);
-  padding:10px 14px;
-  font-size:14px;
-  z-index:899;
+ position:fixed;
+ right:110px;
+ bottom:22px;
+ width:86px;
+ z-index:20;
+ pointer-events:none;
 }
 
 @media (max-width:900px){
