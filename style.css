@@ -249,8 +249,8 @@ a{color:inherit}
   position:fixed;
   right:90px;
   bottom:25px;
-  width:58px !important;
-  max-width:58px !important;
+  width:72px !important;
+  max-width:72px !important;
   height:auto !important;
   z-index:998 !important;
   pointer-events:none;
@@ -264,8 +264,8 @@ a{color:inherit}
   .pips{
     right:90px;
     bottom:28px;
-    width:54px !important;
-    max-width:54px !important;
+    width:58px !important;
+    max-width:58px !important;
     height:auto !important;
   }
 }
