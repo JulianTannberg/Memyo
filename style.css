@@ -246,19 +246,23 @@ a{color:inherit}
 .site-footer a:hover{color:var(--memyo-blue)}
 
 .pips{
- position:fixed;
- right:110px;
- bottom:22px;
- width:86px;
- z-index:20;
- pointer-events:none;
+  position: fixed;
+  right: 110px;
+  bottom: 22px;
+  width: 86px !important;
+  max-width: 86px !important;
+  height: auto !important;
+  z-index: 20;
+  pointer-events: none;
 }
 
-@media (max-width: 768px) {
-  .pips {
+@media (max-width: 768px){
+  .pips{
     right: 80px;
     bottom: 18px;
-    width: 64px;
+    width: 64px !important;
+    max-width: 64px !important;
+    height: auto !important;
   }
 }
   .main-nav.open{display:flex}
