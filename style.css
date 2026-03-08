@@ -296,3 +296,13 @@ a{color:inherit}
   .hero-subtitle,.page-subtitle,.intro-note,.content-card{font-size:16px}
   .product-content h3{font-size:25px}
 }
+
+body {
+  padding-bottom: 220px;
+}
+
+@media (max-width: 768px) {
+  body {
+    padding-bottom: 280px;
+  }
+}
