@@ -228,11 +228,14 @@ a{color:inherit}
   color:var(--memyo-blue);
 }
 
-.site-footer{
-  margin-top:50px;
-  background:var(--footer);
-  padding:22px 16px;
-  text-align:center;
+.site-footer a {
+  margin: 0 12px;
+  color: #6b6b6b;
+  text-decoration: none;
+}
+
+.site-footer a:hover {
+  text-decoration: underline;
 }
 .site-footer a{
   display:inline-block;
