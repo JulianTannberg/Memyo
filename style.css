@@ -247,8 +247,8 @@ a{color:inherit}
 
 .pips{
   position:fixed;
-  right:92px;
-  bottom:18px;
+  right:90px;
+  bottom:25px;
   width:58px !important;
   max-width:58px !important;
   height:auto !important;
@@ -262,8 +262,8 @@ a{color:inherit}
   }
 
   .pips{
-    right:84px;
-    bottom:18px;
+    right:90px;
+    bottom:28px;
     width:54px !important;
     max-width:54px !important;
     height:auto !important;
