@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>Chinesisch festigen</title>
+  <link rel="stylesheet" href="style.css" />
+  <meta name="theme-color" content="#03172B" />
+  <link rel="manifest" href="manifest.webmanifest" />
+  <link rel="icon" type="image/png" href="icons/icon-192.png" />
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-title" content="Chinesisch" />
+</head>
+<body>
+  <main class="app">
+    <div class="topbar topbarEnd"><a class="miniBtn settingsIcon" href="einstellungen.html" aria-label="Einstellungen" title="Einstellungen"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></a></div>
+    <h1>Kapitelübersicht</h1>
+    <p class="subtitle">Wähle ein Kapitel. Danach findest du Hören, Schreiben und Sprechen passend zum Thema.</p>
+    <div id="profileSetupMount"></div>
+    <section class="grid" id="chapterGrid"></section>
+    <div id="profileEditMount" class="bottomProfile"></div>
+  </main>
+
+  <script src="topics.js"></script>
+  <script src="common.js"></script>
+  <script src="profile.js"></script>
+  <script>
+    window.CF_PROFILE?.mountSetup("profileSetupMount");
+    window.CF_PROFILE?.mountEdit("profileEditMount");
+    const grid = document.getElementById("chapterGrid");
+    const topics = window.CF_TOPICS || [];
+    const scoreNames = ["hoeren","lernen","tippen","schreibtraining","sprechen","ueben_hoeren","ueben_zhde","ueben_dezh","flash","memory","luecken"];
+
+    // Gesamt-Prozent eines Kapitels (Mittel aller gezählten Quoten) oder null
+    function chapterTotal(t){
+      const values = scoreNames.map(n => cfGetScore(n, t.id)).filter(p => p !== null);
+      if(!values.length) return null;
+      return Math.round(values.reduce((a,b) => a+b, 0) / values.length);
+    }
+    function chapterComplete(t){
+      const tot = chapterTotal(t);
+      return tot !== null && tot >= 100;
+    }
+
+    topics.forEach((t, i) => {
+      const hasContent = topicHasContent(t);
+      // Freischaltung: Kapitel 1 immer offen; jedes weitere erst, wenn das
+      // vorherige Kapitel 100 % erreicht hat.
+      const prev = i > 0 ? topics[i-1] : null;
+      const prevDone = !prev || chapterComplete(prev);
+      const available = hasContent && prevDone;
+
+      const el = document.createElement(available ? "a" : "div");
+      el.className = "chapterCard" + (available ? "" : " locked");
+      if(available) el.href = `kapitel.html?id=${t.id}`;
+      el.style.background = `linear-gradient(135deg, ${t.accent}, rgba(255,255,255,.14))`;
+      el.style.color = t.textColor;
+
+      // Fortschritt nur anzeigen, wenn das Kapitel Inhalt hat
+      let scoreHtml = "";
+      if(hasContent){
+        const total = chapterTotal(t);
+        if(total !== null){
+          if(total >= 100) el.classList.add("complete");
+          scoreHtml = `
+            <div class="chapterScore">${total} %</div>
+            <div class="chapterBar"><div style="width:${total}%"></div></div>
+          `;
+        }
+      }
+
+      // Badge: ohne Inhalt = bald; mit Inhalt aber gesperrt = vorheriges Kapitel abschließen
+      let badge = "";
+      if(!hasContent) badge = `<span class="soonBadge">Bald verfügbar</span>`;
+      else if(!available) badge = `<span class="soonBadge">🔒 Erst Kapitel ${prev.id} abschließen</span>`;
+
+      el.innerHTML = `
+        <div class="chapterNo">Kapitel ${t.id}</div>
+        <div class="chapterTitle">${escapeHtml(t.title)}</div>
+        <p class="chapterShort">${escapeHtml(t.short)}</p>
+        ${badge}
+        ${scoreHtml}
+      `;
+      grid.appendChild(el);
+    });
+  </script>
+</body>
+</html>
