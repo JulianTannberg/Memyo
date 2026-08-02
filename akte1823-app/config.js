@@ -5,8 +5,8 @@ window.AKTE1823_CONFIG = {
   supabaseAnonKey: "sb_publishable_UPpX42hzOlk652iwFXplvQ_nmFhYQmk",
   turnstileSiteKey: "0x4AAAAAAEEncwDipUDZ2fQL",
 
-  // Diese Angaben gelten für alle Spielrunden und müssen nur einmal
-  // ergänzt werden, sobald die Stadtbibliothek das Buch bestätigt hat.
+  // Diese Angaben gelten für alle Spielrunden und werden nur einmal ergänzt.
+  // Das Bibliothekswort ist die exakte Lösung, die die erste Aufgabe freischaltet.
   route: {
     libraryTitle: "",
     libraryPage: "",

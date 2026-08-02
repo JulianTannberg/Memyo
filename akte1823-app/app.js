@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const APP_VERSION = "1.3.0";
+  const APP_VERSION = "2.0.0";
   const STORAGE_KEY = "akte1823.game";
   const CODE_CHARS = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
 
@@ -14,9 +14,7 @@
     libraryPage: "",
     libraryLine: "",
     libraryWord: "",
-    libraryNote: "Das vorbereitete Buch liegt in der Stadtbibliothek bereit.",
-    teaMuseumTask: "Findet heraus, wer 1806 in Leer einen Laden eröffnete und womit dort gehandelt wurde.",
-    finalDateHint: "Sucht an der letzten Station nach dem vollständigen Datum der Stadtrechte."
+    libraryNote: "Das vorbereitete Buch liegt in der Stadtbibliothek bereit."
   };
 
   const STATIONS = [
@@ -25,104 +23,153 @@
       title: "Stadtbibliothek",
       kicker: "Die Spur im alten Speicher",
       location: { name: "Stadtbibliothek Leer", address: "Wilhelminengang 2, 26789 Leer", lat: 53.22724, lon: 7.45181 },
-      riddle: "Sucht ein Gebäude, in dem früher Waren lagerten und heute Geschichten, Wissen und Erinnerungen gesammelt werden.",
-      task: (setup) => {
+      destinationAnswers: ["Stadtbibliothek", "Bibliothek", "Hermann Tempel Haus", "Hermann-Tempel-Haus"],
+      arrivalClue: "Wo früher Waren in einem Speicher lagerten, werden heute Geschichten, Wissen und Erinnerungen gesammelt. Findet diesen Ort und gebt seinen Namen ein.",
+      arrivalHint: "Gesucht ist eine öffentliche Einrichtung im historischen Hermann-Tempel-Haus.",
+      taskTitle: "Das vorbereitete Buch",
+      task: (route) => {
         const details = [];
-        if (setup.libraryTitle) details.push(`<li><strong>Titel:</strong> ${escapeHtml(setup.libraryTitle)}</li>`);
-        if (setup.libraryPage) details.push(`<li><strong>Seite:</strong> ${escapeHtml(setup.libraryPage)}</li>`);
-        if (setup.libraryLine) details.push(`<li><strong>Zeile:</strong> ${escapeHtml(setup.libraryLine)}</li>`);
-        if (setup.libraryWord) details.push(`<li><strong>Gesuchtes Wort:</strong> ${escapeHtml(setup.libraryWord)}</li>`);
+        if (route.libraryTitle) details.push(`<li><strong>Titel:</strong> ${escapeHtml(route.libraryTitle)}</li>`);
+        if (route.libraryPage) details.push(`<li><strong>Seite:</strong> ${escapeHtml(route.libraryPage)}</li>`);
+        if (route.libraryLine) details.push(`<li><strong>Zeile:</strong> ${escapeHtml(route.libraryLine)}</li>`);
         return `
-          <p>${escapeHtml(setup.libraryNote || DEFAULT_ROUTE.libraryNote)}</p>
-          ${details.length ? `<ul>${details.join("")}</ul>` : `<p class="callout">Die genaue Buchstelle wird nach dem Anruf bei der Bibliothek ergänzt.</p>`}
-          <p>Notiert das gefundene Wort oder den gefundenen Namen.</p>
+          <p>${escapeHtml(route.libraryNote || DEFAULT_ROUTE.libraryNote)}</p>
+          ${details.length ? `<ul>${details.join("")}</ul>` : `<p class="callout"><strong>Noch offen:</strong> Buch, Seite und Zeile müssen einmalig in <code>config.js</code> eingetragen werden.</p>`}
+          <p><strong>Welches Wort findet ihr an der vorbereiteten Stelle?</strong></p>
         `;
       },
-      hint: "Das Gebäude liegt in der Altstadt und ist heute öffentlich zugänglich.",
-      photo: () => "Fotografiert eure Crew an einem markanten Detail des alten Speichers – so, als hättet ihr gerade eine wichtige Spur entdeckt.",
-      next: "Der nächste Hinweis hängt in einer Kirche an der Wand und erinnert an zu lange Predigten."
+      taskPlaceholder: "Gefundenes Wort",
+      taskHint: "Kontrolliert Titel, Seite und Zeile genau. Groß- und Kleinschreibung spielen keine Rolle.",
+      taskAnswers: (route) => route.libraryWord ? [route.libraryWord] : [],
+      taskSolution: (route) => route.libraryWord || "Bibliothekswort noch nicht eingerichtet",
+      evidence: {
+        fragment: "FLECKEN LEER",
+        label: "Beweisstück 1",
+        explanation: "Der erste versiegelte Aktenstreifen gehört in den Schlusssatz."
+      },
+      photo: "Fotografiert ein markantes Detail des alten Speichergebäudes – so, als hättet ihr dort gerade eine wichtige Spur entdeckt.",
+      nextClue: "Euer nächstes Ziel ist ein Gotteshaus, in dem eine Uhr nicht nur die Zeit zeigte. Sie sollte dafür sorgen, dass eine Predigt nicht endlos dauerte.",
+      nextHint: "Die gesuchte Kirche ist ein großer reformierter Zentralbau in der Altstadt."
     },
     {
       id: 2,
       title: "Große Kirche",
       kicker: "Die Uhr gegenüber der Kanzel",
       location: { name: "Große Kirche", address: "Kirchstraße 14, 26789 Leer", lat: 53.228589, lon: 7.449089 },
-      riddle: "Findet die Kirche, in der eine Uhr nicht nur die Zeit anzeigt, sondern an eine königliche Vorschrift erinnert.",
+      destinationAnswers: ["Große Kirche", "Grosse Kirche", "Große Kirche Leer", "Reformierte Kirche", "Evangelisch reformierte Kirche"],
+      taskTitle: "Der königliche Erlass",
       task: () => `
-        <ol>
-          <li>Welcher König erließ die Vorschrift?</li>
-          <li>In welchem Jahr?</li>
-          <li>Wie lange durfte eine Predigt höchstens dauern?</li>
-        </ol>
-        <p class="callout"><strong>Achtung:</strong> Dieser König ist nicht der König, der Leer die Stadtrechte verlieh.</p>
+        <p>Gegenüber der Kanzel befindet sich eine Uhr. Ein Erlass von 1751 begrenzte die Dauer der Predigt.</p>
+        <p><strong>Wie lange durfte eine Predigt höchstens dauern?</strong></p>
       `,
-      hint: "Schaut gegenüber der Kanzel nach oben – oder fragt die anwesende Person nach der Geschichte der Uhr.",
-      photo: () => "Eine Person hält eine feierliche Ansprache, während die anderen demonstrativ auf die Uhr schauen.",
-      next: "Weiter geht es zu einem alten Haus mit dem Namen eines besonders starken Mannes und einem ungewöhnlichen Glücksbringer."
+      taskPlaceholder: "z. B. 60 Minuten",
+      taskHint: "Gesang und Gebet wurden bei dieser Höchstdauer nicht mitgerechnet.",
+      taskAnswers: () => ["60", "60 Minuten", "eine Stunde", "1 Stunde", "1h"],
+      taskSolution: () => "60 Minuten / eine Stunde",
+      evidence: {
+        fragment: "GEORG IV.",
+        label: "Beweisstück 2",
+        explanation: "Friedrich II. gehört zur Predigtuhr – der Stadtrechtskönig war ein anderer."
+      },
+      photo: "Eine Person hält eine feierliche Ansprache, während die anderen deutlich auf die Uhr zeigen.",
+      nextClue: "Sucht nun ein prächtiges Haus, das den Namen eines biblischen Kraftprotzes trägt. Im Erdgeschoss wird bis heute mit Genussvollem gehandelt.",
+      nextHint: "Der Namensgeber verlor seine Kraft, nachdem ihm die Haare geschnitten worden waren."
     },
     {
       id: 3,
       title: "Haus Samson",
-      kicker: "Der ungewöhnliche Glücksbringer",
+      kicker: "Das Haus des starken Mannes",
       location: { name: "Haus Samson", address: "Rathausstraße 18, 26789 Leer", lat: 53.227058, lon: 7.450967 },
-      riddle: "Gesucht ist ein altes Haus, das den Namen eines besonders starken Mannes trägt. Im Erdgeschoss wird mit etwas Genussvollem gehandelt. Im Inneren versteckt sich ein Glücksbringer, in dem eigentlich gefiederte Bewohner leben könnten.",
+      destinationAnswers: ["Haus Samson", "Samson", "Wein Wolff", "Weinhandlung Wolff"],
+      taskTitle: "Die Jahreszahl an der Fassade",
       task: () => `
-        <p>Findet das Haus und beantwortet:</p>
-        <p><strong>Welcher Gegenstand sollte den Bewohnern Glück bringen?</strong></p>
+        <p>Untersucht die Straßenfassade des Hauses genau.</p>
+        <p><strong>Welche Jahreszahl ist dort zu erkennen?</strong></p>
       `,
-      hint: "Der Hausname erinnert an eine biblische Figur – nicht an den zotteligen Bewohner aus der Sesamstraße.",
-      photo: () => "Stellt vor dem Haus ein möglichst ernstes historisches Gruppenporträt nach.",
-      next: "Eine bronzene Frau mit Tasse und Kanne führt euch zur nächsten Spur."
+      taskPlaceholder: "Vierstellige Jahreszahl",
+      taskHint: "Die Jahreszahl gehört zur heute sichtbaren Fassade und beginnt mit 16.",
+      taskAnswers: () => ["1643"],
+      taskSolution: () => "1643",
+      evidence: {
+        fragment: "11",
+        label: "Beweisstück 3",
+        explanation: "Der dritte Aktenstreifen enthält den Tag des entscheidenden Datums."
+      },
+      photo: "Stellt vor dem Haus ein möglichst ernstes historisches Gruppenporträt nach.",
+      nextClue: "Eine bronzene Frau hält Tasse und Kanne, trinkt aber seit Jahren keinen Schluck. Findet sie und folgt anschließend der Geschichte des Tees.",
+      nextHint: "Die Figur heißt Teelke und steht in der Nähe eines Teemuseums."
     },
     {
       id: 4,
       title: "Teelke & Bünting-Teemuseum",
       kicker: "Die Spur des Tees",
-      location: { name: "Teelke", address: "Brunnenstraße, nahe Bünting-Teemuseum, 26789 Leer", lat: 53.229384, lon: 7.451559 },
-      riddle: "Findet zuerst die bronzene Frau, die seit Jahren eine volle Tasse hält, ohne daraus zu trinken. Untersucht die Figur genau und folgt anschließend der Spur des Tees ins Museum.",
-      task: (setup) => `
-        <ol>
-          <li>Welche Jahreszahl gehört zur Figur?</li>
-          <li>${escapeHtml(setup.teaMuseumTask || DEFAULT_ROUTE.teaMuseumTask)}</li>
-          <li>Welche Jahreszahl gehört zum Beginn des Geschäfts?</li>
-        </ol>
+      location: { name: "Teelke und Bünting-Teemuseum", address: "Brunnenstraße 33, 26789 Leer", lat: 53.229384, lon: 7.451559 },
+      destinationAnswers: ["Teelke", "Teelke Statue", "Bünting Teemuseum", "Buenting Teemuseum", "Teemuseum", "Teelke und Bünting Teemuseum"],
+      taskTitle: "Der Anfang des Handels",
+      task: () => `
+        <p>In der Brunnenstraße begann 1806 die Geschichte eines bekannten Leeraner Handelshauses.</p>
+        <p><strong>Wie hieß der Gründer des damaligen Kolonialwarenladens?</strong></p>
       `,
-      hint: "Nicht das Getränk ist die Lösung. Sucht nach Namen, Jahreszahlen und der Geschichte des Geschäfts.",
-      photo: () => "Macht ein Gruppenfoto mit Teelke oder stellt ein altes Foto der Umgebung möglichst genau nach.",
-      next: "Nun sucht das Gebäude, das heute wie kein anderes zeigt, dass Leer eine Stadt ist."
+      taskPlaceholder: "Vor- und Nachname",
+      taskHint: "Sein Nachname steht noch heute auf Tee aus Ostfriesland.",
+      taskAnswers: () => ["Johann Bünting", "Johann Buenting", "Bünting", "Buenting"],
+      taskSolution: () => "Johann Bünting",
+      evidence: {
+        fragment: "JULI",
+        label: "Beweisstück 4",
+        explanation: "Der vierte Aktenstreifen nennt den Monat des entscheidenden Datums."
+      },
+      photo: "Macht ein Gruppenfoto mit Teelke oder stellt eine besonders feierliche ostfriesische Tee-Szene nach.",
+      nextClue: "Gesucht ist nun das bekannteste repräsentative Gebäude der Stadt. Sein Turm überragt die Altstadt – doch zur Zeit der Stadtrechte stand es noch nicht.",
+      nextHint: "Dort tagen heute Rat und Verwaltung; viele Trauungen finden ebenfalls dort statt."
     },
     {
       id: 5,
       title: "Historisches Rathaus",
-      kicker: "Ein Gebäude mit falscher Spur",
+      kicker: "Die zeitlich falsche Spur",
       location: { name: "Historisches Rathaus", address: "Rathausstraße 1, 26789 Leer", lat: 53.226609, lon: 7.450649 },
-      riddle: "Findet das Gebäude, das heute wie kein anderes für die Stadt Leer steht. Doch Vorsicht: Es ist deutlich jünger als die Verleihung der Stadtrechte.",
+      destinationAnswers: ["Historisches Rathaus", "Rathaus", "Rathaus Leer", "Leeraner Rathaus"],
+      taskTitle: "Jünger als die Stadtrechte",
       task: () => `
-        <p><strong>In welchen Jahren wurde das Historische Rathaus errichtet?</strong></p>
-        <p>Notiert die Bauzeit. Das gesuchte Jahr der Stadtrechte liegt deutlich davor.</p>
+        <p>Das Rathaus wurde erst lange nach der Erhebung Leers zur Stadt fertiggestellt.</p>
+        <p><strong>In welchem Jahr wurde das Historische Rathaus eingeweiht?</strong></p>
       `,
-      hint: "Sucht nach einer Informationstafel am oder nahe dem Gebäude – oder fragt vor Ort nach der Bauzeit.",
-      photo: () => "Eine Person übernimmt auf der Rathaustreppe die Rolle des Stadtoberhaupts; die Crew bildet den feierlichen Empfang.",
-      next: "Zum Schluss geht es dorthin, wo Handel, Wasser und Gewichte zusammenkamen."
+      taskPlaceholder: "Vierstellige Jahreszahl",
+      taskHint: "Die gesuchte Jahreszahl liegt im letzten Jahrzehnt des 19. Jahrhunderts.",
+      taskAnswers: () => ["1894"],
+      taskSolution: () => "1894",
+      evidence: {
+        fragment: "1823",
+        label: "Beweisstück 5",
+        explanation: "Der fünfte Aktenstreifen nennt das Jahr, das deutlich vor dem Rathausbau liegt."
+      },
+      photo: "Eine Person übernimmt auf der Rathaustreppe die Rolle des Stadtoberhaupts; die Crew bildet den feierlichen Empfang.",
+      nextClue: "Zum letzten Fundort geht es dorthin, wo Waren am Wasser gewogen wurden. Bekrönte Waagschalen erinnern noch heute an diese Aufgabe.",
+      nextHint: "Das barocke Gebäude steht unmittelbar am Museumshafen."
     },
     {
       id: 6,
       title: "Alte Waage & Museumshafen",
-      kicker: "Der entscheidende Beweis",
+      kicker: "Der letzte Fundort",
       location: { name: "Alte Waage", address: "Neue Straße 1, 26789 Leer", lat: 53.2264, lon: 7.451719 },
-      riddle: "Schon bevor Leer offiziell eine Stadt wurde, machten Handel, Hafen und Schifffahrt den Ort bedeutend. Findet den Platz, an dem Waren gewogen wurden und historische Schiffe liegen.",
-      task: (setup) => `
-        <ol>
-          <li>In welchem Jahr wurde die Alte Waage erbaut?</li>
-          <li>Welche Gegenstände sind über ihren Eingängen dargestellt?</li>
-          <li>${escapeHtml(setup.finalDateHint || DEFAULT_ROUTE.finalDateHint)}</li>
-          <li>Welcher König verlieh Leer die Stadtrechte?</li>
-        </ol>
-        <p>Stellt außerdem ein altes Hafenfoto möglichst genau nach.</p>
+      destinationAnswers: ["Alte Waage", "Waage", "Historische Waage", "Museumshafen", "Alte Waage und Museumshafen"],
+      taskTitle: "Das Gebäude am Wasser",
+      task: () => `
+        <p>Über den Eingängen erinnern bekrönte Waagschalen an die frühere Funktion des Gebäudes.</p>
+        <p><strong>In welchem Jahr wurde die Alte Waage erbaut?</strong></p>
       `,
-      hint: "Der entscheidende Satz beginnt mit: Am … verlieh König … dem Flecken Leer die Rechte einer Stadt.",
-      photo: () => "Gemeinsames Abschlussfoto an der Waage oder am Museumshafen – möglichst aus derselben Perspektive wie ein altes Foto.",
-      next: "Ihr habt alle Beweise. Öffnet nun die Abschlussakte."
+      taskPlaceholder: "Vierstellige Jahreszahl",
+      taskHint: "Die Jahreszahl liegt am Beginn des 18. Jahrhunderts.",
+      taskAnswers: () => ["1714"],
+      taskSolution: () => "1714",
+      evidence: {
+        fragment: "RECHTE EINER STADT",
+        label: "Beweisstück 6",
+        explanation: "Der letzte Aktenstreifen vervollständigt die historische Aussage."
+      },
+      photo: "Macht ein gemeinsames Abschlussfoto an der Waage oder am Museumshafen – möglichst wie auf einer alten Aufnahme.",
+      nextClue: "",
+      nextHint: ""
     }
   ];
 
@@ -171,6 +218,56 @@
   function normalizeAnswers(answers) {
     return answers && typeof answers === "object" ? answers : {};
   }
+
+  function normalizeGuess(value) {
+    return String(value || "")
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .replace(/ß/g, "ss")
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, " ")
+      .trim();
+  }
+
+  function inputMatches(value, acceptedValues) {
+    const guess = normalizeGuess(value);
+    if (!guess) return false;
+    return (acceptedValues || []).some((accepted) => {
+      const solution = normalizeGuess(accepted);
+      if (!solution) return false;
+      if (guess === solution) return true;
+      if (/^\d+$/.test(solution)) return guess.split(" ").includes(solution);
+      return solution.length >= 5 && guess.includes(solution);
+    });
+  }
+
+  function getStationProgress(stationId) {
+    const raw = normalizeAnswers(state.game?.answers)[String(stationId)];
+    if (raw && typeof raw === "object" && !Array.isArray(raw)) return raw;
+    if (typeof raw === "string" && raw.trim()) return { taskAnswer: raw.trim() };
+    return {};
+  }
+
+  function answersWithStationPatch(stationId, patch) {
+    const answers = { ...normalizeAnswers(state.game.answers) };
+    answers[String(stationId)] = { ...getStationProgress(stationId), ...patch };
+    return answers;
+  }
+
+  function unlockedEvidence() {
+    return STATIONS.filter((station) => getStationProgress(station.id).taskSolved).map((station) => station.evidence);
+  }
+
+  function renderEvidenceCards(evidenceItems = unlockedEvidence()) {
+    if (!evidenceItems.length) return `<p class="help">Noch keine Beweisstücke geöffnet.</p>`;
+    return `<div class="evidence-grid">${evidenceItems.map((evidence) => `
+      <div class="evidence-card">
+        <span>${escapeHtml(evidence.label)}</span>
+        <strong>${escapeHtml(evidence.fragment)}</strong>
+      </div>
+    `).join("")}</div>`;
+  }
+
 
   function showToast(message, duration = 2600) {
     toast.textContent = message;
@@ -542,7 +639,7 @@
       <section class="hero">
         <p class="eyebrow">Historisches Stadtspiel durch Leer</p>
         <h1>Akte 1823</h1>
-        <p>Sechs Stationen führen durch Leers Geschichte. Eine Crew startet die Runde, alle weiteren Geräte treten mit demselben Spielcode bei.</p>
+        <p>Sechs zusammenhängende Spuren führen durch Leers Geschichte. Jede gelöste Aufgabe öffnet ein Beweisstück – und erst das erratene nächste Ziel öffnet die folgende Akte.</p>
         <div class="actions two">
           <button id="createGameButton" class="btn btn-primary" type="button">Spiel starten</button>
           <button id="showJoinButton" class="btn btn-secondary" type="button">Mit Code beitreten</button>
@@ -562,7 +659,7 @@
 
       <section class="panel">
         <h2>Gemeinsam spielen</h2>
-        <p>Eine Person startet das Spiel und legt den Crew-Namen fest. Weitere Mitspielende geben den angezeigten Code ein. Stationen, Antworten und Fortschritt werden anschließend gemeinsam synchronisiert.</p>
+        <p>Eine Person startet das Spiel und legt den Crew-Namen fest. Weitere Mitspielende treten mit dem Code bei. Lösungen, Beweisstücke und der geöffnete Ermittlungsstand werden gemeinsam synchronisiert.</p>
       </section>
     `;
 
@@ -584,8 +681,10 @@
   function renderGameHeader() {
     const current = Number(state.game.current_station || 0);
     const steps = STATIONS.map((station) => {
-      const className = current > station.id ? "done" : current === station.id ? "current" : "";
-      return `<div class="progress-step ${className}" aria-label="Station ${station.id}">${current > station.id ? "✓" : station.id}</div>`;
+      const progress = getStationProgress(station.id);
+      const complete = Boolean(progress.taskSolved && (station.id === 6 || progress.destinationSolved));
+      const className = complete || current > station.id ? "done" : current === station.id ? "current" : "";
+      return `<div class="progress-step ${className}" aria-label="Akte ${station.id}">${complete || current > station.id ? "✓" : station.id}</div>`;
     }).join("");
 
     const crewName = normalizeSetup(state.game.setup).crewName || "Crew";
@@ -594,9 +693,9 @@
       <section class="game-head">
         <div class="game-head-top">
           <div>
-            <div class="game-label">${escapeHtml(crewName)}</div>
-            <div class="game-code">${escapeHtml(state.game.code)}</div>
-            <div class="game-label">Gemeinsamer Spielcode</div>
+            <div class="game-label">Crew</div>
+            <div class="game-code crew-code">${escapeHtml(crewName)}</div>
+            <div class="game-label">Spielcode ${escapeHtml(state.game.code)}</div>
           </div>
           <button id="shareCodeButton" class="btn btn-secondary" type="button">Code teilen</button>
         </div>
@@ -640,127 +739,198 @@
       return `
         <section class="waiting">
           <div class="waiting-icon" aria-hidden="true">⌛</div>
-          <h2>Die Runde wird vorbereitet</h2>
-          <p>Die Person, die das Spiel gestartet hat, legt noch den Crew-Namen fest und öffnet anschließend Station 1.</p>
+          <h2>Die Ermittlungsakte wird vorbereitet</h2>
+          <p>Die Person, die das Spiel gestartet hat, legt noch den Crew-Namen fest und öffnet anschließend die Auftaktspur.</p>
         </section>
       `;
     }
 
     return `
       <section class="panel">
-        <h2>Neue Runde starten</h2>
-        <p>Für jede Runde wird nur ein Crew-Name benötigt. Die Aufgaben der Route bleiben unverändert.</p>
-        ${libraryReady ? "" : `<p class="callout"><strong>Hinweis:</strong> Die genaue Bibliotheksaufgabe ist noch nicht dauerhaft in <code>config.js</code> eingetragen.</p>`}
+        <h2>Neue Spurensuche starten</h2>
+        <p>Die Crew erhält zunächst nur ein Rätsel. Erst das richtige Ziel öffnet die erste Aufgabe.</p>
+        ${libraryReady ? "" : `<p class="callout"><strong>Bibliothek noch nicht fertig:</strong> Buch, Seite, Zeile und Lösungswort fehlen noch in <code>config.js</code>. Zum Testen kann die Notfallauflösung genutzt werden.</p>`}
         <form id="setupForm" class="setup-grid">
           <label class="field">
             <span>Crew-Name</span>
             <input name="crewName" value="${escapeHtml(setup.crewName)}" placeholder="z. B. Hafenfüchse" maxlength="40" required>
           </label>
           <div class="setup-actions">
-            <button id="startRouteButton" class="btn btn-primary" type="submit">Station 1 öffnen</button>
+            <button id="startRouteButton" class="btn btn-primary" type="submit">Auftaktspur öffnen</button>
           </div>
         </form>
       </section>
     `;
   }
 
+  function renderCompassHelp(targetStation, summaryText = "Orientierungshilfe öffnen") {
+    return `
+      <details class="location-details compact-help">
+        <summary>${escapeHtml(summaryText)}</summary>
+        <p>Die Kompassnadel zeigt ungefähr in Richtung des gesuchten Ziels, ohne seinen Namen zu verraten.</p>
+        <button id="startCompassButton" class="btn btn-secondary" data-target-station="${targetStation.id}" type="button">Kompass-Hilfe starten</button>
+        <div id="compassPanel" class="compass-panel" hidden>
+          <p class="compass-warning"><strong>Nur zur Orientierung:</strong> GPS, Handysensoren, Gebäude und Metall können die Anzeige verfälschen. Achtet auf Straßenschilder und den Verkehr.</p>
+          <div class="compass-dial" aria-label="Kompassnadel zum Ziel">
+            <div class="compass-cardinal north">N</div>
+            <div class="compass-cardinal east">O</div>
+            <div class="compass-cardinal south">S</div>
+            <div class="compass-cardinal west">W</div>
+            <div id="compassNeedle" class="compass-needle" aria-hidden="true"><span>▲</span></div>
+            <div class="compass-center" aria-hidden="true"></div>
+          </div>
+          <p id="compassStatus" class="compass-status" aria-live="polite">Standort und Kompass werden vorbereitet …</p>
+          <div class="compass-values">
+            <div><strong id="compassDistance">–</strong><span>Entfernung</span></div>
+            <div><strong id="compassDirection">–</strong><span>Zielrichtung</span></div>
+            <div><strong id="compassAccuracy">–</strong><span>GPS-Genauigkeit</span></div>
+          </div>
+          <button id="stopCompassButton" class="btn btn-text" type="button">Kompass beenden</button>
+        </div>
+        <details class="emergency-address">
+          <summary>Adresse und Karten-App als letzte Notlösung</summary>
+          <p><strong>${escapeHtml(targetStation.location.name)}</strong><br>${escapeHtml(targetStation.location.address)}</p>
+          <a class="btn btn-secondary map-link" href="https://www.google.com/maps/dir/?api=1&destination=${targetStation.location.lat},${targetStation.location.lon}&travelmode=walking" target="_blank" rel="noopener noreferrer">Fußweg in Karten öffnen</a>
+        </details>
+        <p class="help">Der Standort bleibt auf diesem Handy und wird nicht in Supabase gespeichert.</p>
+      </details>
+    `;
+  }
+
+  function renderDestinationPuzzle(sourceStation, targetStation, mode) {
+    const isOpening = mode === "arrival";
+    const clue = isOpening ? targetStation.arrivalClue : sourceStation.nextClue;
+    const hint = isOpening ? targetStation.arrivalHint : sourceStation.nextHint;
+    const progress = getStationProgress(sourceStation.id);
+    const previousGuess = isOpening ? (progress.arrivalGuess || "") : (progress.destinationGuess || "");
+    const prefix = isOpening ? "arrival" : "destination";
+
+    return `
+      <section class="section clue-section">
+        <h2 class="section-title"><span aria-hidden="true">⌕</span> ${isOpening ? "Auftaktspur" : "Letzte Aufgabe dieser Akte"}</h2>
+        <div class="clue-card">
+          <span class="clue-label">${isOpening ? "Findet den ersten Fundort" : "Erratet das nächste Ziel"}</span>
+          <p>${escapeHtml(clue)}</p>
+        </div>
+        <label class="field">
+          <span>Welcher Ort ist gesucht?</span>
+          <input id="${prefix}Guess" value="${escapeHtml(previousGuess)}" autocomplete="off" placeholder="Name des Ortes">
+        </label>
+        <button id="check${isOpening ? "Arrival" : "Destination"}Button" class="btn btn-primary full-button" type="button">Ziel prüfen</button>
+        <details class="hint-details">
+          <summary>Hinweis zum Rätsel</summary>
+          <p>${escapeHtml(hint)}</p>
+        </details>
+        ${renderCompassHelp(targetStation)}
+        <button id="reveal${isOpening ? "Arrival" : "Destination"}Button" class="btn btn-danger full-button" type="button">Ziel aufdecken und weiterspielen</button>
+      </section>
+    `;
+  }
+
+  function renderPhotoSection(station) {
+    return `
+      <details class="optional-photo">
+        <summary>Optionale Fotoaufgabe</summary>
+        <p>${escapeHtml(station.photo)}</p>
+        <div class="photo-actions">
+          <button id="takePhotoButton" class="btn btn-primary" type="button">Kamera öffnen</button>
+          <button id="choosePhotoButton" class="btn btn-secondary" type="button">Bild auswählen</button>
+        </div>
+        <input id="cameraInput" type="file" accept="image/*" capture="environment" hidden>
+        <input id="galleryInput" type="file" accept="image/*" hidden>
+        <div id="photoPreview" class="photo-preview" hidden>
+          <img id="photoPreviewImage" alt="Vorschau des aufgenommenen Fotos">
+          <div class="photo-preview-actions">
+            <button id="sharePhotoButton" class="btn btn-secondary" type="button">Foto speichern oder teilen</button>
+            <a id="downloadPhotoLink" class="btn btn-text" download>Als Datei herunterladen</a>
+          </div>
+          <p class="help">Das Foto wird nicht hochgeladen. Es bleibt auf diesem Gerät.</p>
+        </div>
+      </details>
+    `;
+  }
+
+  function renderFinalPuzzle() {
+    return `
+      <section class="section final-puzzle">
+        <h2 class="section-title"><span aria-hidden="true">✦</span> Abschlussakte zusammensetzen</h2>
+        <p>Alle sechs Beweisstücke sind geöffnet. Setzt daraus Datum, König und Verleihung zusammen.</p>
+        ${renderEvidenceCards(STATIONS.map((station) => station.evidence))}
+        <div class="final-input-grid">
+          <label class="field"><span>Tag</span><input id="finalDay" inputmode="numeric" placeholder="TT"></label>
+          <label class="field"><span>Monat</span><input id="finalMonth" placeholder="Monat"></label>
+          <label class="field"><span>Jahr</span><input id="finalYear" inputmode="numeric" placeholder="JJJJ"></label>
+        </div>
+        <label class="field"><span>Welcher König?</span><input id="finalKing" placeholder="Name und Ordnungszahl"></label>
+        <label class="field"><span>Was wurde Leer verliehen?</span><input id="finalRights" placeholder="…"></label>
+        <button id="checkFinalPuzzleButton" class="btn btn-primary full-button" type="button">Abschlusslösung prüfen</button>
+        <details class="hint-details">
+          <summary>Hinweis zur Abschlussakte</summary>
+          <p>Der Satz beginnt mit: „Am … verlieh König … dem Flecken Leer …“</p>
+        </details>
+        <button id="revealFinalPuzzleButton" class="btn btn-danger full-button" type="button">Auflösung anzeigen</button>
+      </section>
+    `;
+  }
+
   function renderStation(station) {
     const route = normalizeRoute();
-    const answer = normalizeAnswers(state.game.answers)[String(station.id)] || "";
-    const isLast = station.id === 6;
+    const progress = getStationProgress(station.id);
+    const isOpening = station.id === 1 && !progress.arrivalSolved;
+
+    if (isOpening) {
+      return `
+        <article class="station-card">
+          <div class="station-band">Auftakt · Akte 1 von 6</div>
+          <div class="station-body">
+            <h1 class="station-title unknown-title">Fundort unbekannt</h1>
+            <p class="station-kicker">Die erste Spur muss entschlüsselt werden.</p>
+            ${renderDestinationPuzzle(station, station, "arrival")}
+          </div>
+        </article>
+      `;
+    }
+
+    const taskAnswer = progress.taskAnswer || "";
+    const nextStation = station.id < 6 ? STATIONS[station.id] : null;
 
     return `
       <article class="station-card">
-        <div class="station-band">Station ${station.id} von 6</div>
+        <div class="station-band">Akte ${station.id} von 6</div>
         <div class="station-body">
+          <div class="solved-location"><span>Fundort entschlüsselt</span></div>
           <h1 class="station-title">${escapeHtml(station.title)}</h1>
           <p class="station-kicker">${escapeHtml(station.kicker)}</p>
 
-          <section class="section">
-            <h2 class="section-title"><span aria-hidden="true">⌕</span> Findet den Ort</h2>
-            <p class="riddle">${escapeHtml(station.riddle)}</p>
-          </section>
-
-          <section class="section">
-            <h2 class="section-title"><span aria-hidden="true">✎</span> Aufgabe vor Ort</h2>
-            ${station.task(route)}
-          </section>
-
-          <section class="section">
-            <h2 class="section-title"><span aria-hidden="true">✓</span> Eure Antwort</h2>
-            <div class="answer-box">
-              <label class="field" style="margin-top:0">
-                <span>Notizen dieser Station</span>
-                <textarea id="stationAnswer" placeholder="Antwort oder Fundstück notieren …">${escapeHtml(answer)}</textarea>
+          ${!progress.taskSolved ? `
+            <section class="section">
+              <h2 class="section-title"><span aria-hidden="true">✎</span> ${escapeHtml(station.taskTitle)}</h2>
+              ${station.task(route)}
+              <label class="field">
+                <span>Eure Lösung</span>
+                <input id="taskAnswer" value="${escapeHtml(taskAnswer)}" autocomplete="off" placeholder="${escapeHtml(station.taskPlaceholder)}">
               </label>
-              <button id="saveAnswerButton" class="btn btn-secondary" type="button">Antwort für alle speichern</button>
-              <div class="answer-status">Die Antwort erscheint anschließend auf allen verbundenen Geräten.</div>
-            </div>
-          </section>
-
-          <section class="section compass-help-section">
-            <h2 class="section-title"><span aria-hidden="true">🧭</span> Orientierungshilfe</h2>
-            <p>Kommt ihr nicht weiter, zeigt euch die Kompassnadel ungefähr die Richtung zum Ziel.</p>
-            <button id="startCompassButton" class="btn btn-secondary" type="button">Kompass-Hilfe starten</button>
-            <div id="compassPanel" class="compass-panel" hidden>
-              <p class="compass-warning"><strong>Wichtig:</strong> Nur als Orientierung nutzen. GPS, Handysensoren, Gebäude und Metall können die Anzeige verfälschen. Achtet auf Straßenschilder und den Verkehr.</p>
-              <div class="compass-dial" aria-label="Kompassnadel zum Ziel">
-                <div class="compass-cardinal north">N</div>
-                <div class="compass-cardinal east">O</div>
-                <div class="compass-cardinal south">S</div>
-                <div class="compass-cardinal west">W</div>
-                <div id="compassNeedle" class="compass-needle" aria-hidden="true"><span>▲</span></div>
-                <div class="compass-center" aria-hidden="true"></div>
+              <button id="checkTaskButton" class="btn btn-primary full-button" type="button">Lösung prüfen</button>
+              <details class="hint-details">
+                <summary>Hinweis zur Aufgabe</summary>
+                <p>${escapeHtml(station.taskHint)}</p>
+              </details>
+              ${renderCompassHelp(station, "Seid ihr am richtigen Fundort?")}
+              <button id="revealTaskButton" class="btn btn-danger full-button" type="button">Lösung aufdecken und weiterspielen</button>
+            </section>
+          ` : `
+            <section class="section stage-complete">
+              <h2 class="section-title"><span aria-hidden="true">✓</span> Aufgabe gelöst</h2>
+              <p class="solution-note">Eure Lösung: <strong>${escapeHtml(progress.taskAnswer || station.taskSolution(route))}</strong>${progress.taskRevealed ? ` <span class="assisted-mark">mit Notfallhilfe</span>` : ""}</p>
+              <div class="evidence-unlock">
+                <span>${escapeHtml(station.evidence.label)} geöffnet</span>
+                <strong>${escapeHtml(station.evidence.fragment)}</strong>
+                <p>${escapeHtml(station.evidence.explanation)}</p>
               </div>
-              <p id="compassStatus" class="compass-status" aria-live="polite">Standort und Kompass werden vorbereitet …</p>
-              <div class="compass-values">
-                <div><strong id="compassDistance">–</strong><span>Entfernung</span></div>
-                <div><strong id="compassDirection">–</strong><span>Zielrichtung</span></div>
-                <div><strong id="compassAccuracy">–</strong><span>GPS-Genauigkeit</span></div>
-              </div>
-              <button id="stopCompassButton" class="btn btn-text" type="button">Kompass beenden</button>
-            </div>
-            <details class="location-details">
-              <summary>Adresse und Karten-App als Notlösung</summary>
-              <p><strong>${escapeHtml(station.location.name)}</strong><br>${escapeHtml(station.location.address)}</p>
-              <a class="btn btn-secondary map-link" href="https://www.google.com/maps/dir/?api=1&destination=${station.location.lat},${station.location.lon}&travelmode=walking" target="_blank" rel="noopener noreferrer">Fußweg in Karten öffnen</a>
-            </details>
-            <p class="help">Der aktuelle Standort bleibt auf diesem Handy und wird nicht in der gemeinsamen Datenbank gespeichert.</p>
-          </section>
-
-          <section class="section">
-            <h2 class="section-title"><span aria-hidden="true">▣</span> Fotoaufgabe</h2>
-            <p>${escapeHtml(station.photo())}</p>
-            <div class="photo-actions">
-              <button id="takePhotoButton" class="btn btn-primary" type="button">Kamera öffnen</button>
-              <button id="choosePhotoButton" class="btn btn-secondary" type="button">Bild auswählen</button>
-            </div>
-            <input id="cameraInput" type="file" accept="image/*" capture="environment" hidden>
-            <input id="galleryInput" type="file" accept="image/*" hidden>
-            <div id="photoPreview" class="photo-preview" hidden>
-              <img id="photoPreviewImage" alt="Vorschau des aufgenommenen Fotos">
-              <div class="photo-preview-actions">
-                <button id="sharePhotoButton" class="btn btn-secondary" type="button">Foto speichern oder teilen</button>
-                <a id="downloadPhotoLink" class="btn btn-text" download>Als Datei herunterladen</a>
-              </div>
-              <p class="help">Das Foto wird nicht in die gemeinsame Datenbank hochgeladen. Es bleibt auf diesem Gerät.</p>
-            </div>
-          </section>
-
-          <section class="section">
-            <button id="toggleHintButton" class="btn btn-secondary" type="button">${state.revealHint ? "Hinweis ausblenden" : "Notfall-Hinweis anzeigen"}</button>
-            ${state.revealHint ? `<div class="reveal">${escapeHtml(station.hint)}</div>` : ""}
-          </section>
-
-          <section class="section">
-            <h2 class="section-title"><span aria-hidden="true">➜</span> Nächste Spur</h2>
-            <p>${escapeHtml(station.next)}</p>
-          </section>
-
-          <div class="station-nav">
-            <button id="previousStationButton" class="btn btn-secondary" type="button">Zurück</button>
-            <button id="nextStationButton" class="btn btn-primary" type="button">${isLast ? "Abschlussakte öffnen" : "Station abschließen"}</button>
-          </div>
+              ${renderPhotoSection(station)}
+            </section>
+            ${station.id < 6 ? renderDestinationPuzzle(station, nextStation, "next") : renderFinalPuzzle()}
+          `}
         </div>
       </article>
     `;
@@ -769,12 +939,11 @@
   function renderFinal() {
     const setup = normalizeSetup(state.game.setup);
     const answers = normalizeAnswers(state.game.answers);
-    const summary = STATIONS.map((station) => `
-      <div>
-        <strong>Station ${station.id}: ${escapeHtml(station.title)}</strong>
-        <span>${escapeHtml(answers[String(station.id)] || "Keine Notiz gespeichert")}</span>
-      </div>
-    `).join("");
+    const finalState = answers.final && typeof answers.final === "object" ? answers.final : {};
+    const assistedSteps = STATIONS.reduce((count, station) => {
+      const progress = getStationProgress(station.id);
+      return count + Number(Boolean(progress.taskRevealed)) + Number(Boolean(progress.arrivalRevealed || progress.destinationRevealed));
+    }, 0) + Number(Boolean(finalState.revealed));
 
     return `
       <section class="final-card">
@@ -783,17 +952,17 @@
         <div class="final-statement">
           Am <strong>11. Juli 1823</strong> verlieh König <strong>Georg IV.</strong> dem Flecken Leer die Rechte einer Stadt.
         </div>
-        <p>Das heutige Historische Rathaus konnte dabei noch nicht dort stehen: Es wurde erst von <strong>1889 bis 1894</strong> erbaut.</p>
-        <p>Damit ist die historische Spurensuche für <strong>${escapeHtml(setup.crewName || "eure Crew")}</strong> abgeschlossen.</p>
+        <p>Das Historische Rathaus konnte damals noch nicht dort stehen: Es wurde erst 1894 eingeweiht.</p>
+        <p>Die Spurensuche der Crew <strong>${escapeHtml(setup.crewName || "Unbekannt")}</strong> ist abgeschlossen.</p>
+        ${assistedSteps ? `<p class="assistance-summary">${assistedSteps} Lösung${assistedSteps === 1 ? " wurde" : "en wurden"} mithilfe der Notfallauflösung geöffnet. Das Spiel ist trotzdem vollständig abgeschlossen.</p>` : `<p class="assistance-summary success">Alle entscheidenden Schritte wurden ohne Aufdecken gelöst.</p>`}
 
         <section class="section">
-          <h2 class="section-title">Gesammelte Notizen</h2>
-          <div class="answer-summary">${summary}</div>
+          <h2 class="section-title">Gesammelte Beweisstücke</h2>
+          ${renderEvidenceCards(STATIONS.map((station) => station.evidence))}
         </section>
 
-        <div class="actions two">
-          <button id="backToStationSixButton" class="btn btn-secondary" type="button">Zurück zu Station 6</button>
-          <button id="restartGameButton" class="btn btn-primary" type="button">Runde zurücksetzen</button>
+        <div class="actions">
+          <button id="restartGameButton" class="btn btn-primary" type="button">Neue Runde starten</button>
         </div>
       </section>
     `;
@@ -815,43 +984,148 @@
     });
   }
 
-  function bindStationEvents(stationId) {
-    document.getElementById("startCompassButton")?.addEventListener("click", () => startCompass(stationId));
-    document.getElementById("stopCompassButton")?.addEventListener("click", stopCompass);
+  async function checkArrival(station) {
+    const input = document.getElementById("arrivalGuess");
+    const guess = input?.value || "";
+    if (!inputMatches(guess, station.destinationAnswers)) {
+      showToast("Das ist noch nicht der gesuchte Fundort. Nutzt bei Bedarf den Hinweis.");
+      return;
+    }
+    const answers = answersWithStationPatch(station.id, { arrivalGuess: guess.trim(), arrivalSolved: true });
+    await updateGame({ answers }, "Erster Fundort richtig entschlüsselt.");
+  }
 
+  async function revealArrival(station) {
+    if (!confirm(`Den ersten Fundort „${station.title}“ aufdecken? Die Spurensuche kann danach normal weitergehen.`)) return;
+    const answers = answersWithStationPatch(station.id, { arrivalGuess: station.title, arrivalSolved: true, arrivalRevealed: true });
+    await updateGame({ answers }, "Fundort mit Notfallhilfe geöffnet.");
+  }
+
+  async function checkTask(station) {
+    const route = normalizeRoute();
+    const input = document.getElementById("taskAnswer");
+    const answer = input?.value || "";
+    const accepted = station.taskAnswers(route).filter(Boolean);
+    if (!accepted.length) {
+      showToast("Diese Bibliothekslösung ist noch nicht in config.js eingerichtet.", 4200);
+      return;
+    }
+    if (!inputMatches(answer, accepted)) {
+      showToast("Die Lösung passt noch nicht. Prüft den Fundort und nutzt bei Bedarf den Hinweis.");
+      return;
+    }
+    const answers = answersWithStationPatch(station.id, { taskAnswer: answer.trim(), taskSolved: true });
+    await updateGame({ answers }, `${station.evidence.label} wurde geöffnet.`);
+  }
+
+  async function revealTask(station) {
+    const route = normalizeRoute();
+    const solution = station.taskSolution(route);
+    if (!confirm(`Die Lösung „${solution}“ aufdecken? Das Beweisstück wird markiert als mit Notfallhilfe gelöst.`)) return;
+    const answers = answersWithStationPatch(station.id, { taskAnswer: solution, taskSolved: true, taskRevealed: true });
+    await updateGame({ answers }, "Aufgabe mit Notfallhilfe geöffnet.");
+  }
+
+  async function checkDestination(station) {
+    const target = STATIONS[station.id];
+    const input = document.getElementById("destinationGuess");
+    const guess = input?.value || "";
+    if (!target || !inputMatches(guess, target.destinationAnswers)) {
+      showToast("Das ist noch nicht das nächste Ziel. Lest die Spur noch einmal genau.");
+      return;
+    }
+    const answers = answersWithStationPatch(station.id, { destinationGuess: guess.trim(), destinationSolved: true });
+    await updateGame({ answers, current_station: target.id }, `Richtig: ${target.title} wurde als nächste Akte geöffnet.`);
+  }
+
+  async function revealDestination(station) {
+    const target = STATIONS[station.id];
+    if (!target) return;
+    if (!confirm(`Das nächste Ziel „${target.title}“ aufdecken und die nächste Akte öffnen?`)) return;
+    const answers = answersWithStationPatch(station.id, { destinationGuess: target.title, destinationSolved: true, destinationRevealed: true });
+    await updateGame({ answers, current_station: target.id }, "Nächstes Ziel mit Notfallhilfe geöffnet.");
+  }
+
+  function finalPuzzleIsCorrect() {
+    const day = normalizeGuess(document.getElementById("finalDay")?.value);
+    const month = normalizeGuess(document.getElementById("finalMonth")?.value);
+    const year = normalizeGuess(document.getElementById("finalYear")?.value);
+    const king = normalizeGuess(document.getElementById("finalKing")?.value);
+    const rights = normalizeGuess(document.getElementById("finalRights")?.value);
+    const dayOk = day === "11";
+    const monthOk = month === "juli" || month === "7" || month === "07";
+    const yearOk = year === "1823";
+    const kingOk = king.includes("georg") && (king.includes("iv") || king.split(" ").includes("4") || king.includes("vier"));
+    const rightsOk = rights.includes("stadt");
+    return dayOk && monthOk && yearOk && kingOk && rightsOk;
+  }
+
+  async function finishFinalPuzzle(revealed = false) {
+    const answers = { ...normalizeAnswers(state.game.answers), final: { solved: true, revealed } };
+    await updateGame({ answers, current_station: 7 }, revealed ? "Abschlussakte mit Notfallhilfe geöffnet." : "Abschlussakte vollständig gelöst.");
+  }
+
+  function bindPhotoEvents(stationId) {
     document.getElementById("takePhotoButton")?.addEventListener("click", () => document.getElementById("cameraInput")?.click());
     document.getElementById("choosePhotoButton")?.addEventListener("click", () => document.getElementById("galleryInput")?.click());
     document.getElementById("cameraInput")?.addEventListener("change", (event) => handlePhotoSelected(event, stationId));
     document.getElementById("galleryInput")?.addEventListener("change", (event) => handlePhotoSelected(event, stationId));
     document.getElementById("sharePhotoButton")?.addEventListener("click", sharePhoto);
     if (state.photoFile && state.photoStationId === stationId) showPhotoPreview();
+  }
 
-    document.getElementById("saveAnswerButton")?.addEventListener("click", () => {
-      saveAnswer(stationId, document.getElementById("stationAnswer").value);
-    });
-    document.getElementById("toggleHintButton")?.addEventListener("click", () => {
-      state.revealHint = !state.revealHint;
-      renderGame();
-    });
-    document.getElementById("previousStationButton")?.addEventListener("click", () => goToStation(Math.max(0, stationId - 1)));
-    document.getElementById("nextStationButton")?.addEventListener("click", async () => {
-      const answer = document.getElementById("stationAnswer").value;
-      if (answer.trim()) {
-        const answers = { ...normalizeAnswers(state.game.answers), [String(stationId)]: answer.trim() };
-        const target = stationId === 6 ? 7 : stationId + 1;
-        await updateGame({ answers, current_station: target }, stationId === 6 ? "Abschlussakte geöffnet." : "Nächste Station geöffnet.");
-      } else {
-        const proceed = confirm("Ihr habt noch keine Antwort notiert. Station trotzdem abschließen?");
-        if (proceed) await goToStation(stationId === 6 ? 7 : stationId + 1);
-      }
-    });
+  function bindCompassEvents() {
+    const button = document.getElementById("startCompassButton");
+    button?.addEventListener("click", () => startCompass(Number(button.dataset.targetStation)));
+    document.getElementById("stopCompassButton")?.addEventListener("click", stopCompass);
+  }
+
+  function bindStationEvents(stationId) {
+    const station = STATIONS[stationId - 1];
+    const progress = getStationProgress(stationId);
+    bindCompassEvents();
+
+    if (stationId === 1 && !progress.arrivalSolved) {
+      document.getElementById("checkArrivalButton")?.addEventListener("click", () => checkArrival(station));
+      document.getElementById("revealArrivalButton")?.addEventListener("click", () => revealArrival(station));
+      document.getElementById("arrivalGuess")?.addEventListener("keydown", (event) => {
+        if (event.key === "Enter") checkArrival(station);
+      });
+      return;
+    }
+
+    if (!progress.taskSolved) {
+      document.getElementById("checkTaskButton")?.addEventListener("click", () => checkTask(station));
+      document.getElementById("revealTaskButton")?.addEventListener("click", () => revealTask(station));
+      document.getElementById("taskAnswer")?.addEventListener("keydown", (event) => {
+        if (event.key === "Enter") checkTask(station);
+      });
+      return;
+    }
+
+    bindPhotoEvents(stationId);
+
+    if (stationId < 6) {
+      document.getElementById("checkDestinationButton")?.addEventListener("click", () => checkDestination(station));
+      document.getElementById("revealDestinationButton")?.addEventListener("click", () => revealDestination(station));
+      document.getElementById("destinationGuess")?.addEventListener("keydown", (event) => {
+        if (event.key === "Enter") checkDestination(station);
+      });
+    } else {
+      document.getElementById("checkFinalPuzzleButton")?.addEventListener("click", () => {
+        if (finalPuzzleIsCorrect()) finishFinalPuzzle(false);
+        else showToast("Die Abschlussakte passt noch nicht vollständig. Prüft alle sechs Beweisstücke.", 4200);
+      });
+      document.getElementById("revealFinalPuzzleButton")?.addEventListener("click", () => {
+        if (confirm("Die vollständige Abschlusslösung anzeigen?")) finishFinalPuzzle(true);
+      });
+    }
   }
 
   function bindFinalEvents() {
-    document.getElementById("backToStationSixButton")?.addEventListener("click", () => goToStation(6));
     document.getElementById("restartGameButton")?.addEventListener("click", () => {
-      if (confirm("Fortschritt und Antworten der Runde wirklich zurücksetzen?")) {
-        updateGame({ current_station: 0, answers: {} }, "Runde wurde zurückgesetzt.");
+      if (confirm("Fortschritt und Beweisstücke dieser Runde wirklich zurücksetzen?")) {
+        updateGame({ current_station: 0, answers: {} }, "Neue Runde vorbereitet.");
       }
     });
   }
