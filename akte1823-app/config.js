@@ -3,5 +3,6 @@
 // Niemals den service_role-Schlüssel hier eintragen.
 window.AKTE1823_CONFIG = {
   supabaseUrl: "DEINE_SUPABASE_PROJECT_URL",
-  supabaseAnonKey: "DEIN_SUPABASE_PUBLISHABLE_KEY"
+  supabaseAnonKey: "DEIN_SUPABASE_PUBLISHABLE_KEY",
+  turnstileSiteKey: "0x4AAAAAAEEncwDipUDZ2fQL"
 };
