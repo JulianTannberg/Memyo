@@ -277,3 +277,14 @@ button { -webkit-tap-highlight-color: transparent; }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { scroll-behavior: auto !important; transition: none !important; }
 }
+
+
+.captcha-panel { text-align: center; }
+.turnstile-slot {
+  display: flex;
+  min-height: 70px;
+  align-items: center;
+  justify-content: center;
+  margin: 0.8rem 0 0.45rem;
+}
+.turnstile-slot iframe { max-width: 100%; }

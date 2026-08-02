@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const APP_VERSION = "1.0.0";
+  const APP_VERSION = "1.1.0";
   const STORAGE_KEY = "akte1823.game";
   const CODE_CHARS = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
 
@@ -124,7 +124,8 @@
     channel: null,
     busy: false,
     revealHint: false,
-    setupOpen: false
+    setupOpen: false,
+    turnstileWidgetId: null
   };
 
   const app = document.getElementById("app");
@@ -181,6 +182,90 @@
     );
   }
 
+  function captchaIsConfigured() {
+    const siteKey = window.AKTE1823_CONFIG?.turnstileSiteKey || "";
+    return Boolean(siteKey && !siteKey.includes("DEIN_"));
+  }
+
+  function waitForTurnstile(timeoutMs = 10000) {
+    return new Promise((resolve, reject) => {
+      if (window.turnstile?.render) {
+        resolve(window.turnstile);
+        return;
+      }
+
+      const started = Date.now();
+      const timer = window.setInterval(() => {
+        if (window.turnstile?.render) {
+          window.clearInterval(timer);
+          resolve(window.turnstile);
+        } else if (Date.now() - started >= timeoutMs) {
+          window.clearInterval(timer);
+          reject(new Error("Turnstile konnte nicht geladen werden."));
+        }
+      }, 100);
+    });
+  }
+
+  function renderCaptchaGate(message = "Bitte bestätigt kurz, dass ihr keine automatisierte Anfrage seid.") {
+    app.innerHTML = `
+      <section class="hero">
+        <p class="eyebrow">Sicherheitsprüfung</p>
+        <h1>Akte 1823</h1>
+        <p>${escapeHtml(message)}</p>
+      </section>
+      <section class="panel captcha-panel">
+        <h2>Verbindung vorbereiten</h2>
+        <div id="turnstileWidget" class="turnstile-slot" aria-label="Cloudflare Turnstile Sicherheitsprüfung"></div>
+        <p id="captchaStatus" class="help" aria-live="polite">Die Prüfung startet automatisch.</p>
+      </section>
+    `;
+  }
+
+  async function getCaptchaToken() {
+    if (!captchaIsConfigured()) {
+      throw new Error("Turnstile Site Key fehlt in config.js.");
+    }
+
+    renderCaptchaGate();
+    setConnection("Prüfung …");
+    const turnstile = await waitForTurnstile();
+    const container = document.getElementById("turnstileWidget");
+    const status = document.getElementById("captchaStatus");
+
+    return new Promise((resolve, reject) => {
+      let settled = false;
+
+      const fail = (message) => {
+        if (settled) return;
+        settled = true;
+        if (status) status.textContent = message;
+        reject(new Error(message));
+      };
+
+      try {
+        state.turnstileWidgetId = turnstile.render(container, {
+          sitekey: window.AKTE1823_CONFIG.turnstileSiteKey,
+          theme: "light",
+          action: "anonymous-signin",
+          callback: (token) => {
+            if (settled) return;
+            settled = true;
+            if (status) status.textContent = "Prüfung erfolgreich. Anmeldung läuft …";
+            resolve(token);
+          },
+          "error-callback": () => fail("Die Sicherheitsprüfung ist fehlgeschlagen. Bitte die Seite neu laden."),
+          "expired-callback": () => {
+            if (status) status.textContent = "Die Prüfung ist abgelaufen. Bitte erneut bestätigen.";
+            if (state.turnstileWidgetId !== null) turnstile.reset(state.turnstileWidgetId);
+          }
+        });
+      } catch (error) {
+        fail(error?.message || "Die Sicherheitsprüfung konnte nicht gestartet werden.");
+      }
+    });
+  }
+
   function generateCode(length = 6) {
     const values = new Uint32Array(length);
     crypto.getRandomValues(values);
@@ -208,14 +293,22 @@
       }
     });
 
-    setConnection("Anmelden …");
+    setConnection("Verbindung prüfen …");
     let { data: sessionData, error: sessionError } = await state.client.auth.getSession();
     if (sessionError) throw sessionError;
 
     if (!sessionData.session) {
-      const result = await state.client.auth.signInAnonymously();
+      const captchaToken = await getCaptchaToken();
+      setConnection("Anmelden …");
+      const result = await state.client.auth.signInAnonymously({
+        options: { captchaToken }
+      });
       if (result.error) throw result.error;
       sessionData = { session: result.data.session };
+    }
+
+    if (!sessionData.session?.user) {
+      throw new Error("Es konnte keine anonyme Sitzung erstellt werden.");
     }
 
     state.user = sessionData.session.user;
@@ -409,8 +502,8 @@
         <p>Die App ist gebaut, aber noch nicht mit deinem Supabase-Projekt verbunden.</p>
       </section>
       <section class="panel">
-        <h2>Es fehlen zwei Werte</h2>
-        <p>Trage in <code>config.js</code> die <strong>Project URL</strong> und den <strong>Publishable/Anon Key</strong> ein. Danach funktioniert das Erstellen und Beitreten per Spielcode.</p>
+        <h2>Supabase ist noch nicht vollständig verbunden</h2>
+        <p>Trage in <code>config.js</code> noch den <strong>Publishable Key</strong> ein. Project URL und Turnstile Site Key sind bereits vorbereitet.</p>
         <p class="help">Den geheimen service_role-Schlüssel niemals in die Datei eintragen.</p>
       </section>
     `;
@@ -735,6 +828,8 @@
       message = "Anonyme Anmeldungen sind in Supabase noch nicht aktiviert.";
     } else if (raw.toLowerCase().includes("game not found")) {
       message = "Dieser Spielcode wurde nicht gefunden.";
+    } else if (raw.toLowerCase().includes("captcha") || raw.toLowerCase().includes("turnstile")) {
+      message = "Die Sicherheitsprüfung konnte nicht abgeschlossen werden. Bitte die Seite neu laden.";
     } else if (raw.toLowerCase().includes("row-level security")) {
       message = "Die Supabase-Datenbankregeln sind noch nicht vollständig eingerichtet.";
     }
