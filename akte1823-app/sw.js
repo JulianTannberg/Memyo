@@ -1,10 +1,10 @@
-const CACHE_NAME = "akte1823-v6";
+const CACHE_NAME = "akte1823-v7";
 const APP_SHELL = [
   "./",
   "./index.html",
-  "./styles.css?v=2.1.0",
-  "./app.js?v=2.1.0",
-  "./config.js?v=2.1.0",
+  "./styles.css?v=2.2.0",
+  "./app.js?v=2.2.0",
+  "./config.js?v=2.2.0",
   "./manifest.webmanifest",
   "./assets/icon.svg"
 ];

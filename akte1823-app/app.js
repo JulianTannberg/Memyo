@@ -1,9 +1,10 @@
 (() => {
   "use strict";
 
-  const APP_VERSION = "2.1.0";
+  const APP_VERSION = "2.2.0";
   const STORAGE_KEY = "akte1823.game";
   const SNAPSHOT_KEY = "akte1823.game.snapshot";
+  const RECENT_GAMES_KEY = "akte1823.recentGames";
   const CODE_CHARS = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
 
   const DEFAULT_SETUP = {
@@ -406,15 +407,111 @@
     }
   }
 
+  function getRecentGames() {
+    const items = safeJsonParse(localStorage.getItem(RECENT_GAMES_KEY));
+    return Array.isArray(items) ? items.filter((item) => item?.id) : [];
+  }
+
+  function storeRecentGames(items) {
+    localStorage.setItem(RECENT_GAMES_KEY, JSON.stringify(items.slice(0, 8)));
+  }
+
+  function rememberRecentGame(game) {
+    if (!game?.id) return;
+    const normalizedGame = {
+      ...game,
+      setup: normalizeSetup(game.setup),
+      answers: normalizeAnswers(game.answers)
+    };
+    const currentStation = Number(normalizedGame.current_station || 0);
+    const entry = {
+      id: normalizedGame.id,
+      code: normalizedGame.code,
+      crewName: normalizedGame.setup.crewName || "Crew",
+      currentStation,
+      completed: currentStation >= 7,
+      updatedAt: Date.now(),
+      snapshot: normalizedGame
+    };
+    const items = getRecentGames().filter((item) => item.id !== entry.id);
+    items.unshift(entry);
+    storeRecentGames(items);
+  }
+
   function saveGameSnapshot(game) {
     if (!game?.id) return;
     localStorage.setItem(STORAGE_KEY, JSON.stringify({ id: game.id, code: game.code }));
     localStorage.setItem(SNAPSHOT_KEY, JSON.stringify(game));
+    rememberRecentGame(game);
   }
 
   function clearStoredGame() {
     localStorage.removeItem(STORAGE_KEY);
     localStorage.removeItem(SNAPSHOT_KEY);
+  }
+
+  function recentGamesMarkup() {
+    const items = getRecentGames();
+    if (!items.length) return "";
+    return `
+      <section class="panel recent-games-panel">
+        <h2>Spiele auf diesem Handy</h2>
+        <p class="help">Abgeschlossene Runden bleiben hier erhalten. Eine neue Runde bekommt einen eigenen Spielcode.</p>
+        <div class="recent-game-list">
+          ${items.map((item) => {
+            const status = item.completed
+              ? "Abgeschlossen"
+              : item.currentStation > 0
+                ? `Akte ${Math.min(item.currentStation, 6)} von 6`
+                : "Noch nicht gestartet";
+            const date = item.updatedAt ? new Date(item.updatedAt).toLocaleDateString("de-DE") : "";
+            return `
+              <article class="recent-game-card">
+                <div>
+                  <strong>${escapeHtml(item.crewName || "Crew")}</strong>
+                  <span>Code ${escapeHtml(item.code || "–")} · ${escapeHtml(status)}${date ? ` · ${escapeHtml(date)}` : ""}</span>
+                </div>
+                <button class="btn btn-secondary open-recent-game" type="button" data-game-id="${escapeHtml(item.id)}">Öffnen</button>
+              </article>
+            `;
+          }).join("")}
+        </div>
+      </section>
+    `;
+  }
+
+  async function openRecentGame(gameId) {
+    const item = getRecentGames().find((entry) => entry.id === gameId);
+    if (!item) return;
+
+    if (state.client && state.user) {
+      setBusy(true);
+      try {
+        const { data, error } = await state.client
+          .from("games")
+          .select("*")
+          .eq("id", gameId)
+          .maybeSingle();
+        if (!error && data) {
+          await enterGame(data);
+          return;
+        }
+      } finally {
+        setBusy(false);
+      }
+    }
+
+    if (item.snapshot) {
+      state.game = {
+        ...item.snapshot,
+        setup: normalizeSetup(item.snapshot.setup),
+        answers: normalizeAnswers(item.snapshot.answers)
+      };
+      saveGameSnapshot(state.game);
+      renderGame();
+      setConnection("Gespeicherter Stand", "offline");
+      showToast("Gespeicherter Spielstand geöffnet. Änderungen brauchen eine Live-Verbindung.", 5000);
+    }
   }
 
   function restoreCachedGameView() {
@@ -475,11 +572,17 @@
       if (sessionError) throw sessionError;
 
       if (!sessionData.session) {
-        const captchaToken = await getCaptchaToken();
         setConnection("Anmelden …");
-        const result = await state.client.auth.signInAnonymously({
-          options: { captchaToken }
-        });
+        const captchaEnabled = Boolean(window.AKTE1823_CONFIG?.captchaEnabled);
+        let result;
+        if (captchaEnabled) {
+          const captchaToken = await getCaptchaToken();
+          result = await state.client.auth.signInAnonymously({
+            options: { captchaToken }
+          });
+        } else {
+          result = await state.client.auth.signInAnonymously();
+        }
         if (result.error) throw result.error;
         sessionData = { session: result.data.session };
       }
@@ -504,9 +607,10 @@
       setConnection("Verbindung gestört", "offline");
       if (state.game) {
         renderGame();
-        showToast("Der gespeicherte Spielstand ist geöffnet. Die Live-Verbindung wird erneut versucht.", 5000);
+        showToast("Der gespeicherte Spielstand ist geöffnet. Die Live-Verbindung fehlt gerade.", 5000);
       } else {
-        renderConnectionProblem(error);
+        renderHome();
+        showToast(connectionMessage(error), 6000);
       }
     } finally {
       state.connecting = false;
@@ -712,6 +816,7 @@
 
   async function leaveGame() {
     stopCompass();
+    if (state.game) rememberRecentGame(state.game);
     if (state.channel && state.client) {
       await state.client.removeChannel(state.channel);
       state.channel = null;
@@ -719,7 +824,30 @@
     state.game = null;
     clearStoredGame();
     renderHome();
-    showToast("Spiel auf diesem Handy verlassen.");
+    showToast("Spiel auf diesem Handy verlassen. Der Stand bleibt unten gespeichert.");
+  }
+
+  async function startSeparateGame() {
+    if (state.game) rememberRecentGame(state.game);
+    if (state.channel && state.client) {
+      await state.client.removeChannel(state.channel);
+      state.channel = null;
+    }
+    state.game = null;
+    clearStoredGame();
+    renderHome();
+    await createGame();
+  }
+
+  async function returnHomeKeepingGame() {
+    if (state.game) rememberRecentGame(state.game);
+    if (state.channel && state.client) {
+      await state.client.removeChannel(state.channel);
+      state.channel = null;
+    }
+    state.game = null;
+    clearStoredGame();
+    renderHome();
   }
 
   function renderMissingConfig() {
@@ -744,7 +872,13 @@
   function connectionMessage(error) {
     const raw = String(error?.message || "").toLowerCase();
     if (raw.includes("captcha") || raw.includes("turnstile")) {
-      return "Die Sicherheitsprüfung konnte auf diesem Gerät nicht abgeschlossen werden.";
+      return "Die CAPTCHA-Einstellung in Supabase passt noch nicht zur App. CAPTCHA bitte vorübergehend ausschalten.";
+    }
+    if (raw.includes("rate limit") || raw.includes("too many requests") || raw.includes("429")) {
+      return "Es wurden zu viele Anmeldeversuche durchgeführt. Bitte später erneut versuchen.";
+    }
+    if (raw.includes("anonymous sign-ins are disabled")) {
+      return "Anonyme Anmeldungen sind in Supabase ausgeschaltet.";
     }
     if (!navigator.onLine) return "Dieses Gerät ist gerade offline.";
     return "Die Live-Verbindung konnte gerade nicht hergestellt werden.";
@@ -780,9 +914,14 @@
         <p class="eyebrow">Historisches Stadtspiel durch Leer</p>
         <h1>Akte 1823</h1>
         <p>Sechs zusammenhängende Spuren führen durch Leers Geschichte. Jede gelöste Aufgabe öffnet ein Beweisstück – und erst das erratene nächste Ziel öffnet die folgende Akte.</p>
-        ${state.user ? "" : `<p class="callout"><strong>Verbindung wird vorbereitet.</strong> Sobald oben „Online“ steht, kann das Spiel gestartet oder betreten werden.</p>`}
+        ${state.lastConnectionError ? `
+          <div class="callout">
+            <strong>Die Live-Verbindung fehlt gerade.</strong> ${escapeHtml(connectionMessage(state.lastConnectionError))}
+            <button id="homeRetryButton" class="btn btn-secondary compact-button" type="button">Verbindung erneut versuchen</button>
+          </div>
+        ` : !state.user ? `<p class="callout"><strong>Verbindung wird vorbereitet.</strong> Die Startseite bleibt dabei benutzbar.</p>` : ""}
         <div class="actions two">
-          <button id="createGameButton" class="btn btn-primary" type="button" ${state.user ? "" : "disabled"}>Spiel starten</button>
+          <button id="createGameButton" class="btn btn-primary" type="button" ${state.user ? "" : "disabled"}>Neues Spiel starten</button>
           <button id="showJoinButton" class="btn btn-secondary" type="button">Mit Code beitreten</button>
         </div>
       </section>
@@ -798,24 +937,34 @@
         </div>
       </section>
 
+      ${recentGamesMarkup()}
+
       <section class="panel">
         <h2>Gemeinsam spielen</h2>
-        <p>Eine Person startet das Spiel und legt den Crew-Namen fest. Weitere Mitspielende treten mit dem Code bei. Lösungen, Beweisstücke und der geöffnete Ermittlungsstand werden gemeinsam synchronisiert.</p>
+        <p>Eine Person startet das Spiel und legt den Crew-Namen fest. Weitere Mitspielende treten mit dem Code bei. Jede neue Runde erhält einen eigenen Spielcode; ältere Runden bleiben auf diesem Handy erhalten.</p>
       </section>
     `;
 
-    document.getElementById("createGameButton").addEventListener("click", createGame);
-    document.getElementById("showJoinButton").addEventListener("click", () => {
+    document.getElementById("createGameButton")?.addEventListener("click", createGame);
+    document.getElementById("homeRetryButton")?.addEventListener("click", () => {
+      state.lastConnectionError = null;
+      renderHome();
+      initSupabase();
+    });
+    document.getElementById("showJoinButton")?.addEventListener("click", () => {
       const panel = document.getElementById("joinPanel");
       panel.hidden = !panel.hidden;
-      if (!panel.hidden) document.getElementById("joinCode").focus();
+      if (!panel.hidden) document.getElementById("joinCode")?.focus();
     });
-    document.getElementById("joinButton").addEventListener("click", () => joinGame(document.getElementById("joinCode").value));
-    document.getElementById("joinCode").addEventListener("input", (event) => {
+    document.getElementById("joinButton")?.addEventListener("click", () => joinGame(document.getElementById("joinCode")?.value));
+    document.getElementById("joinCode")?.addEventListener("input", (event) => {
       event.target.value = event.target.value.toUpperCase().replace(/[^A-Z2-9]/g, "").slice(0, 6);
     });
-    document.getElementById("joinCode").addEventListener("keydown", (event) => {
+    document.getElementById("joinCode")?.addEventListener("keydown", (event) => {
       if (event.key === "Enter") joinGame(event.currentTarget.value);
+    });
+    document.querySelectorAll(".open-recent-game").forEach((button) => {
+      button.addEventListener("click", () => openRecentGame(button.dataset.gameId));
     });
   }
 
@@ -1102,9 +1251,11 @@
           ${renderEvidenceCards(STATIONS.map((station) => station.evidence))}
         </section>
 
-        <div class="actions">
-          <button id="restartGameButton" class="btn btn-primary" type="button">Neue Runde starten</button>
+        <div class="actions two">
+          <button id="newSeparateGameButton" class="btn btn-primary" type="button">Neues Spiel anlegen</button>
+          <button id="finalHomeButton" class="btn btn-secondary" type="button">Zur Startseite</button>
         </div>
+        <p class="help">Diese abgeschlossene Runde bleibt unter „Spiele auf diesem Handy“ erhalten.</p>
       </section>
     `;
   }
@@ -1264,11 +1415,12 @@
   }
 
   function bindFinalEvents() {
-    document.getElementById("restartGameButton")?.addEventListener("click", () => {
-      if (confirm("Fortschritt und Beweisstücke dieser Runde wirklich zurücksetzen?")) {
-        updateGame({ current_station: 0, answers: {} }, "Neue Runde vorbereitet.");
+    document.getElementById("newSeparateGameButton")?.addEventListener("click", () => {
+      if (confirm("Ein neues Spiel mit einem neuen Code anlegen? Die abgeschlossene Runde bleibt erhalten.")) {
+        startSeparateGame();
       }
     });
+    document.getElementById("finalHomeButton")?.addEventListener("click", returnHomeKeepingGame);
   }
 
   function normalizeDegrees(value) {
@@ -1523,11 +1675,9 @@
   homeButton.addEventListener("click", () => {
     if (state.game) {
       renderGame();
-    } else if (state.user) {
-      renderHome();
     } else {
-      renderOpening("Die Verbindung wird erneut aufgebaut …");
-      initSupabase();
+      renderHome();
+      if (!state.user) initSupabase();
     }
     window.scrollTo({ top: 0, behavior: "smooth" });
   });
@@ -1546,9 +1696,7 @@
 
     const sharedCode = codeFromUrl();
     const cachedGameShown = !sharedCode && restoreCachedGameView();
-    if (!cachedGameShown) {
-      renderOpening(sharedCode ? `Das Spiel ${sharedCode} wird geöffnet …` : "Die App wird geöffnet …");
-    }
+    if (!cachedGameShown) renderHome();
     initSupabase();
   });
 
