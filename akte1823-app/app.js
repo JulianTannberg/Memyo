@@ -1,8 +1,9 @@
 (() => {
   "use strict";
 
-  const APP_VERSION = "2.0.0";
+  const APP_VERSION = "2.1.0";
   const STORAGE_KEY = "akte1823.game";
+  const SNAPSHOT_KEY = "akte1823.game.snapshot";
   const CODE_CHARS = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
 
   const DEFAULT_SETUP = {
@@ -190,7 +191,9 @@
     compassHeading: null,
     compassPosition: null,
     compassOrientationHandler: null,
-    compassActive: false
+    compassActive: false,
+    connecting: false,
+    lastConnectionError: null
   };
 
   const app = document.getElementById("app");
@@ -391,49 +394,123 @@
     return Array.from(values, (value) => CODE_CHARS[value % CODE_CHARS.length]).join("");
   }
 
+  function cleanGameCode(value) {
+    return String(value || "").toUpperCase().replace(/[^A-Z2-9]/g, "").slice(0, 6);
+  }
+
+  function codeFromUrl() {
+    try {
+      return cleanGameCode(new URL(location.href).searchParams.get("code"));
+    } catch {
+      return "";
+    }
+  }
+
+  function saveGameSnapshot(game) {
+    if (!game?.id) return;
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({ id: game.id, code: game.code }));
+    localStorage.setItem(SNAPSHOT_KEY, JSON.stringify(game));
+  }
+
+  function clearStoredGame() {
+    localStorage.removeItem(STORAGE_KEY);
+    localStorage.removeItem(SNAPSHOT_KEY);
+  }
+
+  function restoreCachedGameView() {
+    const snapshot = safeJsonParse(localStorage.getItem(SNAPSHOT_KEY));
+    if (!snapshot?.id) return false;
+    state.game = {
+      ...snapshot,
+      setup: normalizeSetup(snapshot.setup),
+      answers: normalizeAnswers(snapshot.answers)
+    };
+    renderGame();
+    setConnection("Verbinden …");
+    return true;
+  }
+
+  function renderOpening(message = "Die gemeinsame Ermittlungsakte wird geöffnet …") {
+    app.innerHTML = `
+      <section class="hero">
+        <p class="eyebrow">Historisches Stadtspiel durch Leer</p>
+        <h1>Akte 1823</h1>
+        <p>${escapeHtml(message)}</p>
+      </section>
+      <section class="panel">
+        <p class="help">Einen Augenblick – Spielstand und Sicherheitsprüfung werden vorbereitet.</p>
+      </section>
+    `;
+  }
+
   async function initSupabase() {
-    if (!configIsReady()) {
-      renderMissingConfig();
-      setConnection("Noch nicht eingerichtet", "offline");
-      return;
-    }
+    if (state.connecting) return;
+    state.connecting = true;
+    state.lastConnectionError = null;
 
-    if (!window.supabase?.createClient) {
-      renderFatal("Die Supabase-Bibliothek konnte nicht geladen werden. Prüfe die Internetverbindung.");
-      return;
-    }
-
-    const { supabaseUrl, supabaseAnonKey } = window.AKTE1823_CONFIG;
-    state.client = window.supabase.createClient(supabaseUrl, supabaseAnonKey, {
-      auth: {
-        persistSession: true,
-        autoRefreshToken: true,
-        detectSessionInUrl: false
+    try {
+      if (!configIsReady()) {
+        renderMissingConfig();
+        setConnection("Noch nicht eingerichtet", "offline");
+        return;
       }
-    });
 
-    setConnection("Verbindung prüfen …");
-    let { data: sessionData, error: sessionError } = await state.client.auth.getSession();
-    if (sessionError) throw sessionError;
+      if (!window.supabase?.createClient) {
+        throw new Error("Die Supabase-Bibliothek konnte nicht geladen werden.");
+      }
 
-    if (!sessionData.session) {
-      const captchaToken = await getCaptchaToken();
-      setConnection("Anmelden …");
-      const result = await state.client.auth.signInAnonymously({
-        options: { captchaToken }
-      });
-      if (result.error) throw result.error;
-      sessionData = { session: result.data.session };
+      const { supabaseUrl, supabaseAnonKey } = window.AKTE1823_CONFIG;
+      if (!state.client) {
+        state.client = window.supabase.createClient(supabaseUrl, supabaseAnonKey, {
+          auth: {
+            persistSession: true,
+            autoRefreshToken: true,
+            detectSessionInUrl: false
+          }
+        });
+      }
+
+      setConnection("Verbindung prüfen …");
+      let { data: sessionData, error: sessionError } = await state.client.auth.getSession();
+      if (sessionError) throw sessionError;
+
+      if (!sessionData.session) {
+        const captchaToken = await getCaptchaToken();
+        setConnection("Anmelden …");
+        const result = await state.client.auth.signInAnonymously({
+          options: { captchaToken }
+        });
+        if (result.error) throw result.error;
+        sessionData = { session: result.data.session };
+      }
+
+      if (!sessionData.session?.user) {
+        throw new Error("Es konnte keine anonyme Sitzung erstellt werden.");
+      }
+
+      state.user = sessionData.session.user;
+      setConnection(navigator.onLine ? "Online" : "Offline", navigator.onLine ? "online" : "offline");
+
+      const sharedCode = codeFromUrl();
+      if (sharedCode) {
+        await joinGame(sharedCode, { fromLink: true });
+        return;
+      }
+
+      await restoreGame();
+    } catch (error) {
+      state.lastConnectionError = error;
+      console.error(error);
+      setConnection("Verbindung gestört", "offline");
+      if (state.game) {
+        renderGame();
+        showToast("Der gespeicherte Spielstand ist geöffnet. Die Live-Verbindung wird erneut versucht.", 5000);
+      } else {
+        renderConnectionProblem(error);
+      }
+    } finally {
+      state.connecting = false;
     }
-
-    if (!sessionData.session?.user) {
-      throw new Error("Es konnte keine anonyme Sitzung erstellt werden.");
-    }
-
-    state.user = sessionData.session.user;
-    setConnection(navigator.onLine ? "Online" : "Offline", navigator.onLine ? "online" : "offline");
-
-    await restoreGame();
   }
 
   async function restoreGame() {
@@ -449,8 +526,14 @@
       .eq("id", stored.id)
       .maybeSingle();
 
-    if (error || !data) {
-      localStorage.removeItem(STORAGE_KEY);
+    if (error) {
+      if (!state.game) restoreCachedGameView();
+      throw error;
+    }
+
+    if (!data) {
+      clearStoredGame();
+      state.game = null;
       renderHome();
       return;
     }
@@ -463,6 +546,10 @@
   }
 
   async function createGame() {
+    if (!state.client || !state.user) {
+      showToast("Die Verbindung wird noch vorbereitet. Bitte gleich erneut versuchen.");
+      return;
+    }
     setBusy(true);
     try {
       let game = null;
@@ -489,11 +576,16 @@
     }
   }
 
-  async function joinGame(code) {
-    const cleanCode = String(code || "").toUpperCase().replace(/[^A-Z2-9]/g, "").slice(0, 6);
+  async function joinGame(code, options = {}) {
+    const cleanCode = cleanGameCode(code);
     if (cleanCode.length !== 6) {
       showToast("Bitte den sechsstelligen Spielcode eingeben.");
-      return;
+      return false;
+    }
+
+    if (!state.client || !state.user) {
+      showToast("Die Verbindung wird noch vorbereitet. Bitte gleich erneut versuchen.");
+      return false;
     }
 
     setBusy(true);
@@ -503,9 +595,23 @@
       const game = Array.isArray(data) ? data[0] : data;
       if (!game) throw new Error("Der Spielcode wurde nicht gefunden.");
       await enterGame(game);
+      if (options.fromLink) {
+        const cleanUrl = new URL(location.href);
+        cleanUrl.searchParams.delete("code");
+        history.replaceState({}, "", cleanUrl);
+      }
       showToast(`Mit Spiel ${game.code} verbunden.`);
+      return true;
     } catch (error) {
+      if (options.fromLink) {
+        renderHome();
+        const panel = document.getElementById("joinPanel");
+        const input = document.getElementById("joinCode");
+        if (panel) panel.hidden = false;
+        if (input) input.value = cleanCode;
+      }
       handleError(error, "Der Spielcode wurde nicht gefunden oder ist nicht mehr gültig.");
+      return false;
     } finally {
       setBusy(false);
     }
@@ -519,7 +625,7 @@
     };
     state.revealHint = false;
     state.setupOpen = false;
-    localStorage.setItem(STORAGE_KEY, JSON.stringify({ id: game.id, code: game.code }));
+    saveGameSnapshot(state.game);
     await subscribeToGame(game.id);
     renderGame();
   }
@@ -542,6 +648,7 @@
             answers: normalizeAnswers(payload.new.answers)
           };
           state.revealHint = false;
+          saveGameSnapshot(state.game);
           renderGame();
           showToast("Der gemeinsame Spielstand wurde aktualisiert.", 1500);
         }
@@ -568,6 +675,7 @@
         setup: normalizeSetup(data.setup),
         answers: normalizeAnswers(data.answers)
       };
+      saveGameSnapshot(state.game);
       renderGame();
       if (successMessage) showToast(successMessage);
       return true;
@@ -609,7 +717,7 @@
       state.channel = null;
     }
     state.game = null;
-    localStorage.removeItem(STORAGE_KEY);
+    clearStoredGame();
     renderHome();
     showToast("Spiel auf diesem Handy verlassen.");
   }
@@ -630,7 +738,39 @@
   }
 
   function renderFatal(message) {
-    app.innerHTML = `<div class="error-box"><strong>Fehler:</strong> ${escapeHtml(message)}</div>`;
+    renderConnectionProblem(new Error(message));
+  }
+
+  function connectionMessage(error) {
+    const raw = String(error?.message || "").toLowerCase();
+    if (raw.includes("captcha") || raw.includes("turnstile")) {
+      return "Die Sicherheitsprüfung konnte auf diesem Gerät nicht abgeschlossen werden.";
+    }
+    if (!navigator.onLine) return "Dieses Gerät ist gerade offline.";
+    return "Die Live-Verbindung konnte gerade nicht hergestellt werden.";
+  }
+
+  function renderConnectionProblem(error) {
+    app.innerHTML = `
+      <section class="hero">
+        <p class="eyebrow">Akte 1823</p>
+        <h1>Verbindung erneut versuchen</h1>
+        <p>${escapeHtml(connectionMessage(error))}</p>
+      </section>
+      <section class="panel">
+        <p>Die App selbst ist geöffnet. Für den gemeinsamen Spielstand braucht dieses Gerät noch eine erfolgreiche Verbindung.</p>
+        <div class="actions">
+          <button id="retryConnectionButton" class="btn btn-primary" type="button">Erneut verbinden</button>
+          <button id="showHomeAnywayButton" class="btn btn-secondary" type="button">Startseite anzeigen</button>
+        </div>
+        <p class="help">Hilft das nicht, die Seite einmal direkt in Chrome oder Safari öffnen und VPN oder Werbeblocker testweise ausschalten.</p>
+      </section>
+    `;
+    document.getElementById("retryConnectionButton")?.addEventListener("click", () => {
+      renderOpening("Die Verbindung wird erneut aufgebaut …");
+      initSupabase();
+    });
+    document.getElementById("showHomeAnywayButton")?.addEventListener("click", renderHome);
   }
 
   function renderHome() {
@@ -640,8 +780,9 @@
         <p class="eyebrow">Historisches Stadtspiel durch Leer</p>
         <h1>Akte 1823</h1>
         <p>Sechs zusammenhängende Spuren führen durch Leers Geschichte. Jede gelöste Aufgabe öffnet ein Beweisstück – und erst das erratene nächste Ziel öffnet die folgende Akte.</p>
+        ${state.user ? "" : `<p class="callout"><strong>Verbindung wird vorbereitet.</strong> Sobald oben „Online“ steht, kann das Spiel gestartet oder betreten werden.</p>`}
         <div class="actions two">
-          <button id="createGameButton" class="btn btn-primary" type="button">Spiel starten</button>
+          <button id="createGameButton" class="btn btn-primary" type="button" ${state.user ? "" : "disabled"}>Spiel starten</button>
           <button id="showJoinButton" class="btn btn-secondary" type="button">Mit Code beitreten</button>
         </div>
       </section>
@@ -653,7 +794,7 @@
             <span>Sechsstelliger Code</span>
             <input id="joinCode" class="code-input" inputmode="text" autocomplete="one-time-code" maxlength="6" placeholder="ABC234">
           </label>
-          <button id="joinButton" class="btn btn-primary" type="button" style="align-self:end">Beitreten</button>
+          <button id="joinButton" class="btn btn-primary" type="button" style="align-self:end" ${state.user ? "" : "disabled"}>Beitreten</button>
         </div>
       </section>
 
@@ -1345,14 +1486,18 @@
   async function shareCode() {
     const crewName = normalizeSetup(state.game.setup).crewName || "Crew";
     const text = `Akte 1823 – ${crewName} – Spielcode: ${state.game.code}`;
+    const shareUrl = new URL(location.href);
+    shareUrl.search = "";
+    shareUrl.hash = "";
+    shareUrl.searchParams.set("code", state.game.code);
     try {
       if (navigator.share) {
-        await navigator.share({ title: "Akte 1823", text, url: location.href });
+        await navigator.share({ title: "Akte 1823", text, url: shareUrl.toString() });
       } else if (navigator.clipboard) {
-        await navigator.clipboard.writeText(`${text}\n${location.href}`);
-        showToast("Code und Link wurden kopiert.");
+        await navigator.clipboard.writeText(`${text}\n${shareUrl}`);
+        showToast("Code und direkter Spieleinstieg wurden kopiert.");
       } else {
-        showToast(text, 4500);
+        showToast(`${text} – ${shareUrl}`, 6000);
       }
     } catch (error) {
       if (error?.name !== "AbortError") showToast(text, 4500);
@@ -1376,27 +1521,35 @@
   }
 
   homeButton.addEventListener("click", () => {
-    if (state.game) renderGame();
-    else renderHome();
+    if (state.game) {
+      renderGame();
+    } else if (state.user) {
+      renderHome();
+    } else {
+      renderOpening("Die Verbindung wird erneut aufgebaut …");
+      initSupabase();
+    }
     window.scrollTo({ top: 0, behavior: "smooth" });
   });
 
-  window.addEventListener("online", () => setConnection(state.game ? "Live verbunden" : "Online", "online"));
+  window.addEventListener("online", () => {
+    setConnection(state.game ? "Live verbunden" : "Online", "online");
+    if (!state.user) initSupabase();
+  });
   window.addEventListener("offline", () => setConnection("Offline", "offline"));
   window.addEventListener("pagehide", () => stopCompass(false));
 
-  window.addEventListener("load", async () => {
+  window.addEventListener("load", () => {
     if ("serviceWorker" in navigator) {
       navigator.serviceWorker.register("./sw.js").catch((error) => console.warn("Service Worker:", error));
     }
 
-    try {
-      await initSupabase();
-    } catch (error) {
-      console.error(error);
-      renderFatal("Die Verbindung zur gemeinsamen Datenbank konnte nicht hergestellt werden.");
-      setConnection("Fehler", "offline");
+    const sharedCode = codeFromUrl();
+    const cachedGameShown = !sharedCode && restoreCachedGameView();
+    if (!cachedGameShown) {
+      renderOpening(sharedCode ? `Das Spiel ${sharedCode} wird geöffnet …` : "Die App wird geöffnet …");
     }
+    initSupabase();
   });
 
   console.info(`Akte 1823 v${APP_VERSION}`);
