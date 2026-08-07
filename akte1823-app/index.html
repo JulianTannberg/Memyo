@@ -542,11 +542,45 @@
   function photoPath(record){const d=new Date(record.createdAt);const day=d.toISOString().slice(0,10);return `photos/${day}/${record.id}.jpg`;}
   async function uploadOne(record){
     if(!supabaseConfigured())throw new Error('Supabase ist nicht eingerichtet.');
-    const path=record.path||photoPath(record); const endpoint=`${settings.supabaseUrl}/storage/v1/object/${encodeURIComponent(settings.supabaseBucket)}/${path.split('/').map(encodeURIComponent).join('/')}`;
-    const res=await fetch(endpoint,{method:'POST',headers:{apikey:settings.supabaseAnonKey,'Content-Type':'image/jpeg','x-upsert':'false'},body:record.blob});
-    if(!res.ok){const txt=await res.text().catch(()=>res.statusText);lastUploadError=`Upload fehlgeschlagen (${res.status}): ${txt}`;throw new Error(lastUploadError);}
+    const path=record.path||photoPath(record);
+    const encodedPath=path.split('/').map(encodeURIComponent).join('/');
+    const endpoint=`${settings.supabaseUrl}/storage/v1/object/${encodeURIComponent(settings.supabaseBucket)}/${encodedPath}`;
+    const url=`${settings.supabaseUrl}/storage/v1/object/public/${encodeURIComponent(settings.supabaseBucket)}/${encodedPath}`;
+    const controller=new AbortController();
+    const timeout=setTimeout(()=>controller.abort(),20000);
+    let res;
+    try{
+      res=await fetch(endpoint,{
+        method:'POST',
+        headers:{
+          apikey:settings.supabaseAnonKey,
+          Authorization:`Bearer ${settings.supabaseAnonKey}`,
+          'Content-Type':'image/jpeg',
+          'x-upsert':'false'
+        },
+        body:record.blob,
+        signal:controller.signal,
+        cache:'no-store'
+      });
+    }catch(error){
+      if(error?.name==='AbortError') lastUploadError='Upload abgebrochen: Supabase antwortet nach 20 Sekunden nicht.';
+      else lastUploadError=`Upload-Verbindung fehlgeschlagen: ${error?.message||String(error)}`;
+      throw new Error(lastUploadError);
+    }finally{clearTimeout(timeout);}
+    if(!res.ok){
+      const txt=await res.text().catch(()=>res.statusText||'Unbekannter Fehler');
+      // Falls der Server das Foto schon gespeichert hat, aber die lokale Bestätigung verloren ging,
+      // soll die Warteschlange nicht an einem "already exists" hängen bleiben.
+      if((res.status===400||res.status===409)&&/already exists|duplicate/i.test(txt)){
+        const updated={...record,path,url,status:'uploaded',uploadedAt:Date.now()};
+        await dbPut('photos',updated);
+        lastUploadError='';
+        return updated;
+      }
+      lastUploadError=`Upload fehlgeschlagen (${res.status}): ${txt}`;
+      throw new Error(lastUploadError);
+    }
     lastUploadError='';
-    const url=`${settings.supabaseUrl}/storage/v1/object/public/${encodeURIComponent(settings.supabaseBucket)}/${path.split('/').map(encodeURIComponent).join('/')}`;
     const updated={...record,path,url,status:'uploaded',uploadedAt:Date.now()}; await dbPut('photos',updated);
     if(settings.backupEnabled&&settings.backupWebhookUrl){postWebhook(settings.backupWebhookUrl,settings.backupWebhookToken,{photoUrl:url,photoId:record.id,createdAt:record.createdAt}).catch(()=>{});}
     return updated;
