@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const APP_VERSION = "2.2.0";
+  const APP_VERSION = "3.0.0";
   const STORAGE_KEY = "akte1823.game";
   const SNAPSHOT_KEY = "akte1823.game.snapshot";
   const RECENT_GAMES_KEY = "akte1823.recentGames";
@@ -11,165 +11,158 @@
     crewName: ""
   };
 
-  const DEFAULT_ROUTE = {
-    libraryTitle: "",
-    libraryPage: "",
-    libraryLine: "",
-    libraryWord: "",
-    libraryNote: "Das vorbereitete Buch liegt in der Stadtbibliothek bereit."
-  };
+  const DEFAULT_ROUTE = {};
 
   const STATIONS = [
     {
       id: 1,
-      title: "Stadtbibliothek",
-      kicker: "Die Spur im alten Speicher",
-      location: { name: "Stadtbibliothek Leer", address: "Wilhelminengang 2, 26789 Leer", lat: 53.22724, lon: 7.45181 },
-      destinationAnswers: ["Stadtbibliothek", "Bibliothek", "Hermann Tempel Haus", "Hermann-Tempel-Haus"],
-      arrivalClue: "Wo früher Waren in einem Speicher lagerten, werden heute Geschichten, Wissen und Erinnerungen gesammelt. Findet diesen Ort und gebt seinen Namen ein.",
-      arrivalHint: "Gesucht ist eine öffentliche Einrichtung im historischen Hermann-Tempel-Haus.",
-      taskTitle: "Das vorbereitete Buch",
-      task: (route) => {
-        const details = [];
-        if (route.libraryTitle) details.push(`<li><strong>Titel:</strong> ${escapeHtml(route.libraryTitle)}</li>`);
-        if (route.libraryPage) details.push(`<li><strong>Seite:</strong> ${escapeHtml(route.libraryPage)}</li>`);
-        if (route.libraryLine) details.push(`<li><strong>Zeile:</strong> ${escapeHtml(route.libraryLine)}</li>`);
-        return `
-          <p>${escapeHtml(route.libraryNote || DEFAULT_ROUTE.libraryNote)}</p>
-          ${details.length ? `<ul>${details.join("")}</ul>` : `<p class="callout"><strong>Noch offen:</strong> Buch, Seite und Zeile müssen einmalig in <code>config.js</code> eingetragen werden.</p>`}
-          <p><strong>Welches Wort findet ihr an der vorbereiteten Stelle?</strong></p>
-        `;
-      },
-      taskPlaceholder: "Gefundenes Wort",
-      taskHint: "Kontrolliert Titel, Seite und Zeile genau. Groß- und Kleinschreibung spielen keine Rolle.",
-      taskAnswers: (route) => route.libraryWord ? [route.libraryWord] : [],
-      taskSolution: (route) => route.libraryWord || "Bibliothekswort noch nicht eingerichtet",
+      title: "Teelke",
+      kicker: "Die Spur des Tees",
+      location: { name: "Teelke", address: "Ecke Brunnenstraße / Mühlenstraße, 26789 Leer", lat: 53.229167, lon: 7.451389 },
+      destinationAnswers: ["Teelke", "Teelke Statue", "Teelke Figur", "Teefrau", "Teemädchen"],
+      arrivalClue: "Findet eine bronzene Frau, die seit Jahrzehnten mit Tee auf Gäste wartet. Sie steht dort, wo Brunnenstraße und Mühlenstraße aufeinandertreffen.",
+      arrivalHint: "Sie trägt einen kurzen ostfriesischen Namen und wurde vom Teehandelshaus Bünting gestiftet.",
+      taskTitle: "Was trägt die Teefrau?",
+      task: () => `
+        <p>Schaut euch die Bronzefigur genau an.</p>
+        <p><strong>Welche zwei Dinge hält sie bei sich?</strong></p>
+      `,
+      taskPlaceholder: "z. B. … und …",
+      taskHint: "Beides gehört unmittelbar zur ostfriesischen Teestunde.",
+      taskAnswers: () => ["Tasse und Kanne", "Teetasse und Teekanne", "Tasse Kanne", "Teetasse Teekanne", "Tasse und Teekanne", "Teetasse und Kanne"],
+      taskSolution: () => "Tasse und Kanne",
       evidence: {
-        fragment: "FLECKEN LEER",
+        fragment: "11",
         label: "Beweisstück 1",
-        explanation: "Der erste versiegelte Aktenstreifen gehört in den Schlusssatz."
+        explanation: "Der erste Aktenstreifen liefert den Tag des entscheidenden Datums."
       },
-      photo: "Fotografiert ein markantes Detail des alten Speichergebäudes – so, als hättet ihr dort gerade eine wichtige Spur entdeckt.",
-      nextClue: "Euer nächstes Ziel ist ein Gotteshaus, in dem eine Uhr nicht nur die Zeit zeigte. Sie sollte dafür sorgen, dass eine Predigt nicht endlos dauerte.",
-      nextHint: "Die gesuchte Kirche ist ein großer reformierter Zentralbau in der Altstadt."
+      insideInfo: "Ganz in der Nähe erzählt das Bünting-Teemuseum die Geschichte des Tees, der ostfriesischen Teekultur und des Leeraner Handelshauses Bünting.",
+      photo: "Macht ein Foto, das Tee und Leer verbindet – mit der Figur, einem Detail der Umgebung oder eurer Crew im Hintergrund.",
+      nextClue: "Sucht nun ein Schiff, das niemals Wasser berührt. Es dreht sich hoch über den Dächern im Wind – auf dem höchsten Kirchturm der Stadt.",
+      nextHint: "Das dreimastige Schiff heißt „Schepken Christi“ und gehört zu einer großen reformierten Kirche."
     },
     {
       id: 2,
       title: "Große Kirche",
-      kicker: "Die Uhr gegenüber der Kanzel",
+      kicker: "Das Schiff über den Dächern",
       location: { name: "Große Kirche", address: "Kirchstraße 14, 26789 Leer", lat: 53.228589, lon: 7.449089 },
-      destinationAnswers: ["Große Kirche", "Grosse Kirche", "Große Kirche Leer", "Reformierte Kirche", "Evangelisch reformierte Kirche"],
-      taskTitle: "Der königliche Erlass",
+      destinationAnswers: ["Große Kirche", "Grosse Kirche", "Große Kirche Leer", "Reformierte Kirche", "Evangelisch reformierte Kirche", "Evangelisch-reformierte Kirche"],
+      taskTitle: "Ganz nach oben schauen",
       task: () => `
-        <p>Gegenüber der Kanzel befindet sich eine Uhr. Ein Erlass von 1751 begrenzte die Dauer der Predigt.</p>
-        <p><strong>Wie lange durfte eine Predigt höchstens dauern?</strong></p>
+        <p>Bleibt draußen und betrachtet den Turm bis zur Spitze.</p>
+        <p><strong>Was dreht sich dort oben als Windfahne?</strong></p>
       `,
-      taskPlaceholder: "z. B. 60 Minuten",
-      taskHint: "Gesang und Gebet wurden bei dieser Höchstdauer nicht mitgerechnet.",
-      taskAnswers: () => ["60", "60 Minuten", "eine Stunde", "1 Stunde", "1h"],
-      taskSolution: () => "60 Minuten / eine Stunde",
+      taskPlaceholder: "Was seht ihr auf der Turmspitze?",
+      taskHint: "Es hat Masten und würde normalerweise aufs Wasser gehören.",
+      taskAnswers: () => ["Schiff", "Segelschiff", "dreimastiges Segelschiff", "dreimastiges Schiff", "Schepken Christi"],
+      taskSolution: () => "ein dreimastiges Segelschiff / Schepken Christi",
       evidence: {
-        fragment: "GEORG IV.",
+        fragment: "JULI",
         label: "Beweisstück 2",
-        explanation: "Friedrich II. gehört zur Predigtuhr – der Stadtrechtskönig war ein anderer."
+        explanation: "Der zweite Aktenstreifen ergänzt den Monat."
       },
-      photo: "Eine Person hält eine feierliche Ansprache, während die anderen deutlich auf die Uhr zeigen.",
-      nextClue: "Sucht nun ein prächtiges Haus, das den Namen eines biblischen Kraftprotzes trägt. Im Erdgeschoss wird bis heute mit Genussvollem gehandelt.",
-      nextHint: "Der Namensgeber verlor seine Kraft, nachdem ihm die Haare geschnitten worden waren."
+      insideInfo: "Drinnen gibt es unter anderem eine ungewöhnliche Predigtuhr und die große historische Orgel zu entdecken. Die Predigtuhr erinnert daran, dass Predigten einst zeitlich begrenzt werden sollten.",
+      photo: "Fotografiert den Turm so, dass das Schiff auf der Spitze möglichst gut zu erkennen ist – gern zusammen mit eurer Crew.",
+      nextClue: "Wo früher Waren in einem Speicher lagen, werden heute Geschichten, Wissen und Erinnerungen gesammelt. Sucht das historische Gebäude mit dem Namen eines Mannes an der Fassade.",
+      nextHint: "Heute befindet sich dort die Stadtbibliothek. Der Gebäudename beginnt mit „Hermann“.",
     },
     {
       id: 3,
-      title: "Haus Samson",
-      kicker: "Das Haus des starken Mannes",
-      location: { name: "Haus Samson", address: "Rathausstraße 18, 26789 Leer", lat: 53.227058, lon: 7.450967 },
-      destinationAnswers: ["Haus Samson", "Samson", "Wein Wolff", "Weinhandlung Wolff"],
-      taskTitle: "Die Jahreszahl an der Fassade",
+      title: "Stadtbibliothek · Hermann-Tempel-Haus",
+      kicker: "Vom Speicher zum Wissen",
+      location: { name: "Stadtbibliothek / Hermann-Tempel-Haus", address: "Wilhelminengang 2, 26789 Leer", lat: 53.227240, lon: 7.451810 },
+      destinationAnswers: ["Stadtbibliothek", "Bibliothek", "Stadtbibliothek Leer", "Hermann Tempel Haus", "Hermann-Tempel-Haus", "Hermann Tempel"],
+      taskTitle: "Der Name an der Fassade",
       task: () => `
-        <p>Untersucht die Straßenfassade des Hauses genau.</p>
-        <p><strong>Welche Jahreszahl ist dort zu erkennen?</strong></p>
+        <p>Für diese Aufgabe müsst ihr nicht hinein. Sucht den Namen des historischen Gebäudes außen.</p>
+        <p><strong>Wie heißt das Haus?</strong></p>
       `,
-      taskPlaceholder: "Vierstellige Jahreszahl",
-      taskHint: "Die Jahreszahl gehört zur heute sichtbaren Fassade und beginnt mit 16.",
-      taskAnswers: () => ["1643"],
-      taskSolution: () => "1643",
+      taskPlaceholder: "Name des Gebäudes",
+      taskHint: "Der vollständige Name besteht aus einem Vor- und Nachnamen plus „Haus“.",
+      taskAnswers: () => ["Hermann-Tempel-Haus", "Hermann Tempel Haus", "Hermann Tempel", "Hermann-Tempel"],
+      taskSolution: () => "Hermann-Tempel-Haus",
       evidence: {
-        fragment: "11",
+        fragment: "1823",
         label: "Beweisstück 3",
-        explanation: "Der dritte Aktenstreifen enthält den Tag des entscheidenden Datums."
+        explanation: "Der dritte Aktenstreifen liefert das Jahr."
       },
-      photo: "Stellt vor dem Haus ein möglichst ernstes historisches Gruppenporträt nach.",
-      nextClue: "Eine bronzene Frau hält Tasse und Kanne, trinkt aber seit Jahren keinen Schluck. Findet sie und folgt anschließend der Geschichte des Tees.",
-      nextHint: "Die Figur heißt Teelke und steht in der Nähe eines Teemuseums."
+      insideInfo: "Heute ist das Hermann-Tempel-Haus die Stadtbibliothek und ein Kulturort. In dem historischen Speicher werden Bücher, Medien und Veranstaltungen statt Waren gelagert.",
+      photo: "Sucht ein markantes Detail der Speicherfassade und macht daraus ein möglichst rätselhaftes Beweisfoto.",
+      nextClue: "Weiter geht es zu einem Haus, das den Namen eines außergewöhnlich starken Mannes trägt. An seiner Geschichte hängt auch ein Löwe.",
+      nextHint: "Der Namensgeber ist eine biblische Figur. Das Haus steht in der Rathausstraße.",
     },
     {
       id: 4,
-      title: "Teelke & Bünting-Teemuseum",
-      kicker: "Die Spur des Tees",
-      location: { name: "Teelke und Bünting-Teemuseum", address: "Brunnenstraße 33, 26789 Leer", lat: 53.229384, lon: 7.451559 },
-      destinationAnswers: ["Teelke", "Teelke Statue", "Bünting Teemuseum", "Buenting Teemuseum", "Teemuseum", "Teelke und Bünting Teemuseum"],
-      taskTitle: "Der Anfang des Handels",
+      title: "Haus Samson",
+      kicker: "Der starke Mann und der Löwe",
+      location: { name: "Haus Samson", address: "Rathausstraße 18, 26789 Leer", lat: 53.227058, lon: 7.450967 },
+      destinationAnswers: ["Haus Samson", "Samson", "Wein Wolff", "Weinhandlung Wolff"],
+      taskTitle: "Das Tier des starken Mannes",
       task: () => `
-        <p>In der Brunnenstraße begann 1806 die Geschichte eines bekannten Leeraner Handelshauses.</p>
-        <p><strong>Wie hieß der Gründer des damaligen Kolonialwarenladens?</strong></p>
+        <p>Untersucht die Außenseite und die Hinweise am Haus.</p>
+        <p><strong>Welches Tier gehört zur Darstellung des starken Samson?</strong></p>
       `,
-      taskPlaceholder: "Vor- und Nachname",
-      taskHint: "Sein Nachname steht noch heute auf Tee aus Ostfriesland.",
-      taskAnswers: () => ["Johann Bünting", "Johann Buenting", "Bünting", "Buenting"],
-      taskSolution: () => "Johann Bünting",
+      taskPlaceholder: "Tier",
+      taskHint: "Es gilt als König der Tiere.",
+      taskAnswers: () => ["Löwe", "Loewe", "Löwen", "Loewen"],
+      taskSolution: () => "Löwe",
       evidence: {
-        fragment: "JULI",
+        fragment: "GEORG IV.",
         label: "Beweisstück 4",
-        explanation: "Der vierte Aktenstreifen nennt den Monat des entscheidenden Datums."
+        explanation: "Der vierte Aktenstreifen nennt den König."
       },
-      photo: "Macht ein Gruppenfoto mit Teelke oder stellt eine besonders feierliche ostfriesische Tee-Szene nach.",
-      nextClue: "Gesucht ist nun das bekannteste repräsentative Gebäude der Stadt. Sein Turm überragt die Altstadt – doch zur Zeit der Stadtrechte stand es noch nicht.",
-      nextHint: "Dort tagen heute Rat und Verwaltung; viele Trauungen finden ebenfalls dort statt."
+      insideInfo: "Im Erdgeschoss befindet sich eine traditionsreiche Weinhandlung. In den oberen Etagen verbirgt sich eine historische Sammlung zur ostfriesischen Wohnkultur.",
+      photo: "Macht vor dem Haus ein Gruppenfoto im Stil eines alten, möglichst ernst blickenden Familienporträts – oder fotografiert ein besonderes Fassadendetail.",
+      nextClue: "Nun sucht das Gebäude, das heute wie kaum ein anderes zeigt, dass Leer eine Stadt ist. Sein Turm überragt die Altstadt – zur Zeit der Stadtrechte stand es aber noch nicht.",
+      nextHint: "Hier arbeiten Rat und Verwaltung; das Gebäude liegt nur wenige Schritte vom Hafen entfernt.",
     },
     {
       id: 5,
       title: "Historisches Rathaus",
-      kicker: "Die zeitlich falsche Spur",
+      kicker: "Die Stadt im Wappen",
       location: { name: "Historisches Rathaus", address: "Rathausstraße 1, 26789 Leer", lat: 53.226609, lon: 7.450649 },
-      destinationAnswers: ["Historisches Rathaus", "Rathaus", "Rathaus Leer", "Leeraner Rathaus"],
-      taskTitle: "Jünger als die Stadtrechte",
+      destinationAnswers: ["Historisches Rathaus", "Rathaus", "Rathaus Leer", "Leeraner Rathaus", "Rathaus Leer Ostfriesland"],
+      taskTitle: "Ein Buchstabe für Leer",
       task: () => `
-        <p>Das Rathaus wurde erst lange nach der Erhebung Leers zur Stadt fertiggestellt.</p>
-        <p><strong>In welchem Jahr wurde das Historische Rathaus eingeweiht?</strong></p>
+        <p>Sucht draußen am oder rund um das Rathaus nach dem Leeraner Stadtwappen.</p>
+        <p><strong>Welcher einzelne Buchstabe steht im Zentrum des Wappens?</strong></p>
       `,
-      taskPlaceholder: "Vierstellige Jahreszahl",
-      taskHint: "Die gesuchte Jahreszahl liegt im letzten Jahrzehnt des 19. Jahrhunderts.",
-      taskAnswers: () => ["1894"],
-      taskSolution: () => "1894",
+      taskPlaceholder: "Ein Buchstabe",
+      taskHint: "Der Buchstabe ist zugleich der Anfangsbuchstabe der Stadt.",
+      taskAnswers: () => ["L"],
+      taskSolution: () => "L",
       evidence: {
-        fragment: "1823",
+        fragment: "FLECKEN LEER",
         label: "Beweisstück 5",
-        explanation: "Der fünfte Aktenstreifen nennt das Jahr, das deutlich vor dem Rathausbau liegt."
+        explanation: "Der fünfte Aktenstreifen nennt den Ort im historischen Schlusssatz."
       },
-      photo: "Eine Person übernimmt auf der Rathaustreppe die Rolle des Stadtoberhaupts; die Crew bildet den feierlichen Empfang.",
-      nextClue: "Zum letzten Fundort geht es dorthin, wo Waren am Wasser gewogen wurden. Bekrönte Waagschalen erinnern noch heute an diese Aufgabe.",
-      nextHint: "Das barocke Gebäude steht unmittelbar am Museumshafen."
+      insideInfo: "Im Inneren des Historischen Rathauses sind bei Führungen unter anderem Wand- und Deckenmalereien, das Treppenhaus und der Festsaal sehenswert. Das Rathaus selbst wurde erst 1889 bis 1894 erbaut.",
+      photo: "Macht ein Gruppenfoto mit dem Rathaus im Hintergrund – so, dass das Gebäude klar erkennbar bleibt.",
+      nextClue: "Für das Finale geht es ans Wasser. Sucht das Gebäude, an dem früher Waren gewogen wurden. Über den Eingängen erinnert das passende Arbeitsgerät noch heute daran.",
+      nextHint: "Das Ziel steht unmittelbar am Museumshafen und heißt nach seiner früheren Funktion.",
     },
     {
       id: 6,
       title: "Alte Waage & Museumshafen",
-      kicker: "Der letzte Fundort",
-      location: { name: "Alte Waage", address: "Neue Straße 1, 26789 Leer", lat: 53.2264, lon: 7.451719 },
-      destinationAnswers: ["Alte Waage", "Waage", "Historische Waage", "Museumshafen", "Alte Waage und Museumshafen"],
-      taskTitle: "Das Gebäude am Wasser",
+      kicker: "Das Finale am Wasser",
+      location: { name: "Alte Waage", address: "Neue Straße 1, 26789 Leer", lat: 53.226400, lon: 7.451719 },
+      destinationAnswers: ["Alte Waage", "Waage", "Historische Waage", "Museumshafen", "Alte Waage und Museumshafen", "Alte Waage & Museumshafen"],
+      taskTitle: "Was verrät die alte Funktion?",
       task: () => `
-        <p>Über den Eingängen erinnern bekrönte Waagschalen an die frühere Funktion des Gebäudes.</p>
-        <p><strong>In welchem Jahr wurde die Alte Waage erbaut?</strong></p>
+        <p>Schaut euch die Fassade von draußen genau an.</p>
+        <p><strong>Welches Arbeitsgerät ist über den Eingängen dargestellt und verrät die frühere Funktion des Gebäudes?</strong></p>
       `,
-      taskPlaceholder: "Vierstellige Jahreszahl",
-      taskHint: "Die Jahreszahl liegt am Beginn des 18. Jahrhunderts.",
-      taskAnswers: () => ["1714"],
-      taskSolution: () => "1714",
+      taskPlaceholder: "Arbeitsgerät",
+      taskHint: "Damit wurde bestimmt, wie schwer die Waren waren.",
+      taskAnswers: () => ["Waage", "Waagschalen", "Waagschale", "bekrönte Waagschalen", "Waage mit Schalen"],
+      taskSolution: () => "Waage / Waagschalen",
       evidence: {
         fragment: "RECHTE EINER STADT",
         label: "Beweisstück 6",
         explanation: "Der letzte Aktenstreifen vervollständigt die historische Aussage."
       },
-      photo: "Macht ein gemeinsames Abschlussfoto an der Waage oder am Museumshafen – möglichst wie auf einer alten Aufnahme.",
+      insideInfo: "Das Gebäude erinnert an Leers lange Handelsgeschichte. Heute wird die Alte Waage gastronomisch genutzt; direkt davor und daneben bildet der Museumshafen den passenden Abschluss der Route.",
+      photo: "Macht euer Abschlussfoto am Hafen – mit Alter Waage, Wasser oder historischen Schiffen als Kulisse.",
       nextClue: "",
       nextHint: ""
     }
@@ -913,7 +906,7 @@
       <section class="hero">
         <p class="eyebrow">Historisches Stadtspiel durch Leer</p>
         <h1>Akte 1823</h1>
-        <p>Sechs zusammenhängende Spuren führen durch Leers Geschichte. Jede gelöste Aufgabe öffnet ein Beweisstück – und erst das erratene nächste Ziel öffnet die folgende Akte.</p>
+        <p>Sechs zusammenhängende Spuren führen zu Fuß durch Leers Altstadt bis zum Museumshafen. Jede gelöste Aufgabe öffnet ein Beweisstück – und erst das erratene nächste Ziel öffnet die folgende Akte.</p>
         ${state.lastConnectionError ? `
           <div class="callout">
             <strong>Die Live-Verbindung fehlt gerade.</strong> ${escapeHtml(connectionMessage(state.lastConnectionError))}
@@ -941,7 +934,7 @@
 
       <section class="panel">
         <h2>Gemeinsam spielen</h2>
-        <p>Eine Person startet das Spiel und legt den Crew-Namen fest. Weitere Mitspielende treten mit dem Code bei. Jede neue Runde erhält einen eigenen Spielcode; ältere Runden bleiben auf diesem Handy erhalten.</p>
+        <p>Eine Person startet das Spiel und legt den Crew-Namen fest. Weitere Mitspielende öffnen den geteilten Link oder treten mit dem Code bei. Alle verbundenen Geräte sehen denselben Fortschritt. Jede neue Runde erhält einen eigenen Spielcode; ältere Runden bleiben auf diesem Handy erhalten.</p>
       </section>
     `;
 
@@ -1022,8 +1015,6 @@
 
   function renderLobby(isHost) {
     const setup = normalizeSetup(state.game.setup);
-    const route = normalizeRoute();
-    const libraryReady = Boolean(route.libraryTitle && route.libraryPage && route.libraryLine && route.libraryWord);
 
     if (!isHost) {
       return `
@@ -1038,8 +1029,7 @@
     return `
       <section class="panel">
         <h2>Neue Spurensuche starten</h2>
-        <p>Die Crew erhält zunächst nur ein Rätsel. Erst das richtige Ziel öffnet die erste Aufgabe.</p>
-        ${libraryReady ? "" : `<p class="callout"><strong>Bibliothek noch nicht fertig:</strong> Buch, Seite, Zeile und Lösungswort fehlen noch in <code>config.js</code>. Zum Testen kann die Notfallauflösung genutzt werden.</p>`}
+        <p>Gebt nur einen Crew-Namen ein. Danach erhält die ganze Gruppe dieselbe Auftaktspur. Weitere Geräte können jederzeit mit dem sechsstelligen Spielcode beitreten.</p>
         <form id="setupForm" class="setup-grid">
           <label class="field">
             <span>Crew-Name</span>
@@ -1053,7 +1043,7 @@
     `;
   }
 
-  function renderCompassHelp(targetStation, summaryText = "Orientierungshilfe öffnen") {
+  function renderCompassHelp(targetStation, summaryText = "Kompass & Navigation öffnen") {
     return `
       <details class="location-details compact-help">
         <summary>${escapeHtml(summaryText)}</summary>
@@ -1078,9 +1068,9 @@
           <button id="stopCompassButton" class="btn btn-text" type="button">Kompass beenden</button>
         </div>
         <details class="emergency-address">
-          <summary>Adresse und Karten-App als letzte Notlösung</summary>
+          <summary>Adresse & Karten-Navigation</summary>
           <p><strong>${escapeHtml(targetStation.location.name)}</strong><br>${escapeHtml(targetStation.location.address)}</p>
-          <a class="btn btn-secondary map-link" href="https://www.google.com/maps/dir/?api=1&destination=${targetStation.location.lat},${targetStation.location.lon}&travelmode=walking" target="_blank" rel="noopener noreferrer">Fußweg in Karten öffnen</a>
+          <a class="btn btn-secondary map-link" href="https://www.google.com/maps/dir/?api=1&destination=${targetStation.location.lat},${targetStation.location.lon}&travelmode=walking" target="_blank" rel="noopener noreferrer">Zu Fuß navigieren</a>
         </details>
         <p class="help">Der Standort bleibt auf diesem Handy und wird nicht in Supabase gespeichert.</p>
       </details>
@@ -1120,7 +1110,7 @@
   function renderPhotoSection(station) {
     return `
       <details class="optional-photo">
-        <summary>Optionale Fotoaufgabe</summary>
+        <summary>Fotoaufgabe</summary>
         <p>${escapeHtml(station.photo)}</p>
         <div class="photo-actions">
           <button id="takePhotoButton" class="btn btn-primary" type="button">Kamera öffnen</button>
@@ -1134,7 +1124,7 @@
             <button id="sharePhotoButton" class="btn btn-secondary" type="button">Foto speichern oder teilen</button>
             <a id="downloadPhotoLink" class="btn btn-text" download>Als Datei herunterladen</a>
           </div>
-          <p class="help">Das Foto wird nicht hochgeladen. Es bleibt auf diesem Gerät.</p>
+          <p class="help">Die Fotoaufgabe blockiert das Spiel nicht. Das Foto wird nicht hochgeladen und bleibt auf diesem Gerät.</p>
         </div>
       </details>
     `;
@@ -1205,7 +1195,7 @@
                 <summary>Hinweis zur Aufgabe</summary>
                 <p>${escapeHtml(station.taskHint)}</p>
               </details>
-              ${renderCompassHelp(station, "Seid ihr am richtigen Fundort?")}
+              ${renderCompassHelp(station, "Kompass & Navigation zum Fundort")}
               <button id="revealTaskButton" class="btn btn-danger full-button" type="button">Lösung aufdecken und weiterspielen</button>
             </section>
           ` : `
@@ -1217,6 +1207,12 @@
                 <strong>${escapeHtml(station.evidence.fragment)}</strong>
                 <p>${escapeHtml(station.evidence.explanation)}</p>
               </div>
+              ${station.insideInfo ? `
+                <details class="inside-info">
+                  <summary>Was gibt es drinnen zu entdecken?</summary>
+                  <p>${escapeHtml(station.insideInfo)}</p>
+                </details>
+              ` : ""}
               ${renderPhotoSection(station)}
             </section>
             ${station.id < 6 ? renderDestinationPuzzle(station, nextStation, "next") : renderFinalPuzzle()}
