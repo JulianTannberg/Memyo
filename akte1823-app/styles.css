@@ -642,6 +642,17 @@ button { -webkit-tap-highlight-color: transparent; }
   flex: 0 0 auto;
 }
 
+.recent-game-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  flex: 0 0 auto;
+}
+
+.recent-game-actions .delete-recent-game {
+  color: #8b2f2f;
+}
+
 .compact-button {
   margin-top: 0.75rem;
 }
@@ -653,6 +664,12 @@ button { -webkit-tap-highlight-color: transparent; }
   }
 
   .recent-game-card .btn {
+    width: 100%;
+  }
+
+  .recent-game-actions {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
     width: 100%;
   }
 }
@@ -675,4 +692,47 @@ button { -webkit-tap-highlight-color: transparent; }
 .inside-info p {
   margin: 0;
   padding: 0 1rem 1rem;
+}
+
+
+/* Version 3.0.2: sichtbarer Gruppencode und tolerante Lösungen */
+.game-code-panel {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 0.8rem;
+  align-items: center;
+  padding: 0.8rem;
+  border: 1px solid rgba(247, 241, 230, 0.28);
+  border-radius: 1rem;
+  background: rgba(247, 241, 230, 0.08);
+}
+.game-code-visible {
+  margin-top: 0.1rem;
+  font-size: clamp(1.7rem, 9vw, 2.4rem);
+  letter-spacing: 0.18em;
+  line-height: 1.05;
+}
+.game-code-help {
+  margin-top: 0.35rem;
+  max-width: 32rem;
+  color: rgba(247, 241, 230, 0.8);
+  font-size: 0.72rem;
+  line-height: 1.35;
+}
+.game-share-actions {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 0.45rem;
+  min-width: 8.5rem;
+}
+.answer-help {
+  margin: -0.15rem 0 0.75rem;
+  color: var(--muted);
+  font-size: 0.75rem;
+  line-height: 1.4;
+}
+@media (max-width: 520px) {
+  .game-code-panel { grid-template-columns: 1fr; }
+  .game-share-actions { grid-template-columns: 1fr 1fr; min-width: 0; }
+  .game-share-actions .btn { padding-inline: 0.55rem; }
 }

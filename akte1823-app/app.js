@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const APP_VERSION = "3.0.0";
+  const APP_VERSION = "3.0.3";
   const STORAGE_KEY = "akte1823.game";
   const SNAPSHOT_KEY = "akte1823.game.snapshot";
   const RECENT_GAMES_KEY = "akte1823.recentGames";
@@ -29,7 +29,17 @@
       `,
       taskPlaceholder: "z. B. … und …",
       taskHint: "Beides gehört unmittelbar zur ostfriesischen Teestunde.",
-      taskAnswers: () => ["Tasse und Kanne", "Teetasse und Teekanne", "Tasse Kanne", "Teetasse Teekanne", "Tasse und Teekanne", "Teetasse und Kanne"],
+      taskAnswers: () => [
+        "Tasse und Kanne", "Kanne und Tasse", "Teetasse und Teekanne", "Teekanne und Teetasse",
+        "Tasse Kanne", "Kanne Tasse", "Teetasse Teekanne", "Teekanne Teetasse",
+        "Tasse und Teekanne", "Teekanne und Tasse", "Teetasse und Kanne", "Kanne und Teetasse"
+      ],
+      // Beide Gegenstände müssen erkannt werden. Dabei gelten Tasse/Teetasse und Kanne/Teekanne gleichwertig.
+      // Die allgemeine tolerante Prüfung erlaubt zusätzlich ganze Sätze, Reihenfolgewechsel und kleine Tippfehler.
+      taskGroups: [
+        ["Tasse", "Teetasse", "Tee-Tasse", "Tässchen", "Taesschen"],
+        ["Kanne", "Teekanne", "Tee-Kanne"]
+      ],
       taskSolution: () => "Tasse und Kanne",
       evidence: {
         fragment: "11",
@@ -46,7 +56,7 @@
       title: "Große Kirche",
       kicker: "Das Schiff über den Dächern",
       location: { name: "Große Kirche", address: "Kirchstraße 14, 26789 Leer", lat: 53.228589, lon: 7.449089 },
-      destinationAnswers: ["Große Kirche", "Grosse Kirche", "Große Kirche Leer", "Reformierte Kirche", "Evangelisch reformierte Kirche", "Evangelisch-reformierte Kirche"],
+      destinationAnswers: ["Große Kirche", "Grosse Kirche", "Große Kirche Leer", "Kirche", "Kirche Leer", "Reformierte Kirche", "Große reformierte Kirche", "Evangelisch reformierte Kirche", "Evangelisch-reformierte Kirche"],
       taskTitle: "Ganz nach oben schauen",
       task: () => `
         <p>Bleibt draußen und betrachtet den Turm bis zur Spitze.</p>
@@ -54,7 +64,10 @@
       `,
       taskPlaceholder: "Was seht ihr auf der Turmspitze?",
       taskHint: "Es hat Masten und würde normalerweise aufs Wasser gehören.",
-      taskAnswers: () => ["Schiff", "Segelschiff", "dreimastiges Segelschiff", "dreimastiges Schiff", "Schepken Christi"],
+      taskAnswers: () => [
+        "Schiff", "Schiffchen", "Segelschiff", "Segelboot", "Boot", "dreimastiges Segelschiff",
+        "dreimastiges Schiff", "Dreimaster", "Schepken Christi"
+      ],
       taskSolution: () => "ein dreimastiges Segelschiff / Schepken Christi",
       evidence: {
         fragment: "JULI",
@@ -71,7 +84,7 @@
       title: "Stadtbibliothek · Hermann-Tempel-Haus",
       kicker: "Vom Speicher zum Wissen",
       location: { name: "Stadtbibliothek / Hermann-Tempel-Haus", address: "Wilhelminengang 2, 26789 Leer", lat: 53.227240, lon: 7.451810 },
-      destinationAnswers: ["Stadtbibliothek", "Bibliothek", "Stadtbibliothek Leer", "Hermann Tempel Haus", "Hermann-Tempel-Haus", "Hermann Tempel"],
+      destinationAnswers: ["Stadtbibliothek", "Bibliothek", "Bücherei", "Buecherei", "Stadtbibliothek Leer", "Hermann Tempel Haus", "Hermann-Tempel-Haus", "Hermann Tempel", "Tempel Haus"],
       taskTitle: "Der Name an der Fassade",
       task: () => `
         <p>Für diese Aufgabe müsst ihr nicht hinein. Sucht den Namen des historischen Gebäudes außen.</p>
@@ -79,7 +92,7 @@
       `,
       taskPlaceholder: "Name des Gebäudes",
       taskHint: "Der vollständige Name besteht aus einem Vor- und Nachnamen plus „Haus“.",
-      taskAnswers: () => ["Hermann-Tempel-Haus", "Hermann Tempel Haus", "Hermann Tempel", "Hermann-Tempel"],
+      taskAnswers: () => ["Hermann-Tempel-Haus", "Hermann Tempel Haus", "Hermann Tempel", "Hermann-Tempel", "Tempel Haus", "Hermann Tempelhaus"],
       taskSolution: () => "Hermann-Tempel-Haus",
       evidence: {
         fragment: "1823",
@@ -129,7 +142,7 @@
       `,
       taskPlaceholder: "Ein Buchstabe",
       taskHint: "Der Buchstabe ist zugleich der Anfangsbuchstabe der Stadt.",
-      taskAnswers: () => ["L"],
+      taskAnswers: () => ["L", "Buchstabe L", "L wie Leer"],
       taskSolution: () => "L",
       evidence: {
         fragment: "FLECKEN LEER",
@@ -154,7 +167,7 @@
       `,
       taskPlaceholder: "Arbeitsgerät",
       taskHint: "Damit wurde bestimmt, wie schwer die Waren waren.",
-      taskAnswers: () => ["Waage", "Waagschalen", "Waagschale", "bekrönte Waagschalen", "Waage mit Schalen"],
+      taskAnswers: () => ["Waage", "Waagschalen", "Waagschale", "Schalenwaage", "Balkenwaage", "bekrönte Waagschalen", "Waage mit Schalen"],
       taskSolution: () => "Waage / Waagschalen",
       evidence: {
         fragment: "RECHTE EINER STADT",
@@ -226,15 +239,68 @@
       .trim();
   }
 
+  const ANSWER_STOP_WORDS = new Set([
+    "und", "oder", "ein", "eine", "einer", "einem", "einen", "der", "die", "das", "den", "dem", "des",
+    "im", "in", "am", "an", "auf", "mit", "von", "zu", "zum", "zur", "ist", "sind", "es", "da", "dort", "oben"
+  ]);
+
+  function editDistance(a, b) {
+    if (a === b) return 0;
+    if (!a.length) return b.length;
+    if (!b.length) return a.length;
+    const previous = Array.from({ length: b.length + 1 }, (_, index) => index);
+    for (let i = 1; i <= a.length; i += 1) {
+      let diagonal = previous[0];
+      previous[0] = i;
+      for (let j = 1; j <= b.length; j += 1) {
+        const old = previous[j];
+        const cost = a[i - 1] === b[j - 1] ? 0 : 1;
+        previous[j] = Math.min(previous[j] + 1, previous[j - 1] + 1, diagonal + cost);
+        diagonal = old;
+      }
+    }
+    return previous[b.length];
+  }
+
+  function answerTokenMatches(guessToken, solutionToken) {
+    if (guessToken === solutionToken) return true;
+    if (solutionToken.length >= 4 && guessToken.includes(solutionToken)) return true;
+    if (guessToken.length >= 4 && solutionToken.includes(guessToken)) return true;
+    const minLength = Math.min(guessToken.length, solutionToken.length);
+    if (minLength < 4) return false;
+    const tolerance = Math.max(guessToken.length, solutionToken.length) >= 8 ? 2 : 1;
+    return editDistance(guessToken, solutionToken) <= tolerance;
+  }
+
   function inputMatches(value, acceptedValues) {
     const guess = normalizeGuess(value);
     if (!guess) return false;
+    const guessTokens = guess.split(" ").filter(Boolean);
+
     return (acceptedValues || []).some((accepted) => {
       const solution = normalizeGuess(accepted);
       if (!solution) return false;
       if (guess === solution) return true;
-      if (/^\d+$/.test(solution)) return guess.split(" ").includes(solution);
-      return solution.length >= 5 && guess.includes(solution);
+
+      const solutionTokens = solution.split(" ").filter(Boolean);
+      if (/^\d+$/.test(solution)) return guessTokens.includes(solution);
+      if (solution.length === 1) return guessTokens.includes(solution);
+
+      // Ganze richtige Begriffe dürfen auch in einem normalen Satz stehen.
+      if (solution.length >= 4 && guess.includes(solution)) return true;
+
+      // Bei einem einzelnen Lösungswort sind kleine Tippfehler und Wortformen erlaubt.
+      if (solutionTokens.length === 1) {
+        return guessTokens.some((token) => answerTokenMatches(token, solutionTokens[0]));
+      }
+
+      // Bei mehrteiligen Antworten müssen alle wichtigen Begriffe vorkommen,
+      // Reihenfolge, Füllwörter und kleine Tippfehler spielen aber keine Rolle.
+      const requiredTokens = solutionTokens.filter((token) => !ANSWER_STOP_WORDS.has(token) && token.length > 1);
+      if (!requiredTokens.length) return false;
+      return requiredTokens.every((solutionToken) =>
+        guessTokens.some((guessToken) => answerTokenMatches(guessToken, solutionToken))
+      );
     });
   }
 
@@ -464,13 +530,37 @@
                   <strong>${escapeHtml(item.crewName || "Crew")}</strong>
                   <span>Code ${escapeHtml(item.code || "–")} · ${escapeHtml(status)}${date ? ` · ${escapeHtml(date)}` : ""}</span>
                 </div>
-                <button class="btn btn-secondary open-recent-game" type="button" data-game-id="${escapeHtml(item.id)}">Öffnen</button>
+                <div class="recent-game-actions">
+                  <button class="btn btn-secondary open-recent-game" type="button" data-game-id="${escapeHtml(item.id)}">Öffnen</button>
+                  <button class="btn btn-text delete-recent-game" type="button" data-game-id="${escapeHtml(item.id)}">Löschen</button>
+                </div>
               </article>
             `;
           }).join("")}
         </div>
       </section>
     `;
+  }
+
+  function deleteRecentGame(gameId) {
+    const item = getRecentGames().find((entry) => entry.id === gameId);
+    if (!item) return;
+
+    const crewName = item.crewName || "Crew";
+    const code = item.code || "–";
+    const confirmed = window.confirm(
+      `Spiel „${crewName}“ (Code ${code}) nur von diesem Handy löschen?\n\n` +
+      "Der gemeinsame Spielstand in Supabase und die Spiele auf anderen Handys bleiben erhalten."
+    );
+    if (!confirmed) return;
+
+    storeRecentGames(getRecentGames().filter((entry) => entry.id !== gameId));
+
+    const stored = safeJsonParse(localStorage.getItem(STORAGE_KEY));
+    if (stored?.id === gameId) clearStoredGame();
+
+    renderHome();
+    showToast("Spiel wurde von diesem Handy gelöscht.");
   }
 
   async function openRecentGame(gameId) {
@@ -959,6 +1049,9 @@
     document.querySelectorAll(".open-recent-game").forEach((button) => {
       button.addEventListener("click", () => openRecentGame(button.dataset.gameId));
     });
+    document.querySelectorAll(".delete-recent-game").forEach((button) => {
+      button.addEventListener("click", () => deleteRecentGame(button.dataset.gameId));
+    });
   }
 
   function renderGameHeader() {
@@ -978,9 +1071,18 @@
           <div>
             <div class="game-label">Crew</div>
             <div class="game-code crew-code">${escapeHtml(crewName)}</div>
-            <div class="game-label">Spielcode ${escapeHtml(state.game.code)}</div>
           </div>
-          <button id="shareCodeButton" class="btn btn-secondary" type="button">Code teilen</button>
+        </div>
+        <div class="game-code-panel">
+          <div class="game-code-main">
+            <div class="game-label">Spielcode</div>
+            <div class="game-code game-code-visible">${escapeHtml(state.game.code)}</div>
+            <div class="game-code-help">Diesen Code könnt ihr einfach vorlesen und unter „Mit Code beitreten“ eingeben.</div>
+          </div>
+          <div class="game-share-actions">
+            <button id="copyCodeButton" class="btn btn-secondary" type="button">Code kopieren</button>
+            <button id="shareLinkButton" class="btn btn-secondary" type="button">Link teilen</button>
+          </div>
         </div>
         <div class="progress-wrap"><div class="progress-list">${steps}</div></div>
       </section>
@@ -1096,6 +1198,7 @@
           <span>Welcher Ort ist gesucht?</span>
           <input id="${prefix}Guess" value="${escapeHtml(previousGuess)}" autocomplete="off" placeholder="Name des Ortes">
         </label>
+        <p class="answer-help">Ihr müsst den Namen nicht exakt treffen. Gängige Kurzformen und kleine Tippfehler werden akzeptiert.</p>
         <button id="check${isOpening ? "Arrival" : "Destination"}Button" class="btn btn-primary full-button" type="button">Ziel prüfen</button>
         <details class="hint-details">
           <summary>Hinweis zum Rätsel</summary>
@@ -1190,6 +1293,7 @@
                 <span>Eure Lösung</span>
                 <input id="taskAnswer" value="${escapeHtml(taskAnswer)}" autocomplete="off" placeholder="${escapeHtml(station.taskPlaceholder)}">
               </label>
+              <p class="answer-help">Schreibt einfach, was ihr erkannt habt. Groß-/Kleinschreibung, Wortreihenfolge und kleine Tippfehler sind kein Problem.</p>
               <button id="checkTaskButton" class="btn btn-primary full-button" type="button">Lösung prüfen</button>
               <details class="hint-details">
                 <summary>Hinweis zur Aufgabe</summary>
@@ -1257,7 +1361,8 @@
   }
 
   function bindGameCommonEvents() {
-    document.getElementById("shareCodeButton")?.addEventListener("click", shareCode);
+    document.getElementById("copyCodeButton")?.addEventListener("click", copyGameCode);
+    document.getElementById("shareLinkButton")?.addEventListener("click", shareGameLink);
     document.getElementById("leaveGameButton")?.addEventListener("click", () => {
       if (confirm("Dieses Handy vom Spiel trennen? Die gemeinsame Runde bleibt erhalten.")) leaveGame();
     });
@@ -1298,7 +1403,11 @@
       showToast("Diese Bibliothekslösung ist noch nicht in config.js eingerichtet.", 4200);
       return;
     }
-    if (!inputMatches(answer, accepted)) {
+    const groupMatch = Array.isArray(station.taskGroups) && station.taskGroups.length
+      ? station.taskGroups.every((group) => inputMatches(answer, group))
+      : null;
+    const answerMatches = groupMatch === null ? inputMatches(answer, accepted) : groupMatch;
+    if (!answerMatches) {
       showToast("Die Lösung passt noch nicht. Prüft den Fundort und nutzt bei Bedarf den Hinweis.");
       return;
     }
@@ -1631,24 +1740,40 @@
     }
   }
 
-  async function shareCode() {
+  async function copyGameCode() {
+    const code = state.game?.code || "";
+    if (!code) return;
+    try {
+      if (navigator.clipboard) {
+        await navigator.clipboard.writeText(code);
+        showToast(`Spielcode ${code} wurde kopiert.`);
+      } else {
+        showToast(`Spielcode: ${code}`, 6000);
+      }
+    } catch {
+      showToast(`Spielcode: ${code}`, 6000);
+    }
+  }
+
+  async function shareGameLink() {
     const crewName = normalizeSetup(state.game.setup).crewName || "Crew";
-    const text = `Akte 1823 – ${crewName} – Spielcode: ${state.game.code}`;
+    const code = state.game.code;
+    const text = `Akte 1823 – ${crewName}\nSpielcode: ${code}\nÖffnet den Link oder gebt den Code unter „Mit Code beitreten“ ein.`;
     const shareUrl = new URL(location.href);
     shareUrl.search = "";
     shareUrl.hash = "";
-    shareUrl.searchParams.set("code", state.game.code);
+    shareUrl.searchParams.set("code", code);
     try {
       if (navigator.share) {
         await navigator.share({ title: "Akte 1823", text, url: shareUrl.toString() });
       } else if (navigator.clipboard) {
         await navigator.clipboard.writeText(`${text}\n${shareUrl}`);
-        showToast("Code und direkter Spieleinstieg wurden kopiert.");
+        showToast("Spielcode und Einladungslink wurden kopiert.");
       } else {
-        showToast(`${text} – ${shareUrl}`, 6000);
+        showToast(`Spielcode: ${code}`, 6000);
       }
     } catch (error) {
-      if (error?.name !== "AbortError") showToast(text, 4500);
+      if (error?.name !== "AbortError") showToast(`Spielcode: ${code}`, 6000);
     }
   }
 
