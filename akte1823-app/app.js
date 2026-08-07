@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const APP_VERSION = "3.1.0";
+  const APP_VERSION = "3.1.1";
   const STORAGE_KEY = "akte1823.game";
   const SNAPSHOT_KEY = "akte1823.game.snapshot";
   const RECENT_GAMES_KEY = "akte1823.recentGames";
@@ -206,12 +206,6 @@
     photoFile: null,
     photoUrl: "",
     photoStationId: null,
-    compassStationId: null,
-    compassWatchId: null,
-    compassHeading: null,
-    compassPosition: null,
-    compassOrientationHandler: null,
-    compassActive: false,
     connecting: false,
     lastConnectionError: null,
     memoryOutputUrl: "",
@@ -908,13 +902,11 @@
 
   async function goToStation(stationNumber) {
     const target = Math.max(0, Math.min(7, Number(stationNumber)));
-    stopCompass();
     clearPhotoState();
     await updateGame({ current_station: target }, target === 7 ? "Abschlussakte geöffnet." : "Nächste Station geöffnet.");
   }
 
   async function leaveGame() {
-    stopCompass();
     if (state.game) rememberRecentGame(state.game);
     if (state.channel && state.client) {
       await state.client.removeChannel(state.channel);
@@ -1080,14 +1072,20 @@
     }).join("");
 
     const crewName = normalizeSetup(state.game.setup).crewName || "Crew";
-
-    return `
-      <section class="game-head">
-        <div class="game-head-top compact-game-head">
-          <div class="crew-summary">
-            <div class="game-label">Crew</div>
-            <div class="game-code crew-code">${escapeHtml(crewName)}</div>
-          </div>
+    const codeMarkup = current === 0
+      ? `
+          <div class="game-code-start" aria-label="Spielcode für weitere Geräte">
+            <div class="game-code-main">
+              <div class="game-label">Spielcode für eure Crew</div>
+              <div class="game-code game-code-visible">${escapeHtml(state.game.code)}</div>
+              <div class="game-code-help">Jetzt teilen oder vorlesen. Sobald die Spurensuche startet, bleibt der Code nur noch über „Spielcode anzeigen“ aufrufbar.</div>
+            </div>
+            <div class="game-share-actions">
+              <button id="copyCodeButton" class="btn btn-secondary" type="button">Code kopieren</button>
+              <button id="shareLinkButton" class="btn btn-secondary" type="button">Link teilen</button>
+            </div>
+          </div>`
+      : `
           <details class="game-code-details">
             <summary>Spielcode anzeigen</summary>
             <div class="game-code-panel">
@@ -1101,7 +1099,16 @@
                 <button id="shareLinkButton" class="btn btn-secondary" type="button">Link teilen</button>
               </div>
             </div>
-          </details>
+          </details>`;
+
+    return `
+      <section class="game-head ${current === 0 ? "lobby-game-head" : ""}">
+        <div class="game-head-top compact-game-head">
+          <div class="crew-summary">
+            <div class="game-label">Crew</div>
+            <div class="game-code crew-code">${escapeHtml(crewName)}</div>
+          </div>
+          ${codeMarkup}
         </div>
         <div class="progress-wrap"><div class="progress-list">${steps}</div></div>
       </section>
@@ -1164,36 +1171,13 @@
     `;
   }
 
-  function renderCompassHelp(targetStation, summaryText = "Kompass & Navigation öffnen") {
+  function renderNavigationHelp(targetStation, summaryText = "Navigation öffnen") {
     return `
       <details class="location-details compact-help">
         <summary>${escapeHtml(summaryText)}</summary>
-        <p>Die Kompassnadel zeigt ungefähr in Richtung des gesuchten Ziels, ohne seinen Namen zu verraten.</p>
-        <button id="startCompassButton" class="btn btn-secondary" data-target-station="${targetStation.id}" type="button">Kompass-Hilfe starten</button>
-        <div id="compassPanel" class="compass-panel" hidden>
-          <p class="compass-warning"><strong>Nur zur Orientierung:</strong> GPS, Handysensoren, Gebäude und Metall können die Anzeige verfälschen. Achtet auf Straßenschilder und den Verkehr.</p>
-          <div class="compass-dial" aria-label="Kompassnadel zum Ziel">
-            <div class="compass-cardinal north">N</div>
-            <div class="compass-cardinal east">O</div>
-            <div class="compass-cardinal south">S</div>
-            <div class="compass-cardinal west">W</div>
-            <div id="compassNeedle" class="compass-needle" aria-hidden="true"><span>▲</span></div>
-            <div class="compass-center" aria-hidden="true"></div>
-          </div>
-          <p id="compassStatus" class="compass-status" aria-live="polite">Standort und Kompass werden vorbereitet …</p>
-          <div class="compass-values">
-            <div><strong id="compassDistance">–</strong><span>Entfernung</span></div>
-            <div><strong id="compassDirection">–</strong><span>Zielrichtung</span></div>
-            <div><strong id="compassAccuracy">–</strong><span>GPS-Genauigkeit</span></div>
-          </div>
-          <button id="stopCompassButton" class="btn btn-text" type="button">Kompass beenden</button>
-        </div>
-        <details class="emergency-address">
-          <summary>Adresse & Karten-Navigation</summary>
-          <p><strong>${escapeHtml(targetStation.location.name)}</strong><br>${escapeHtml(targetStation.location.address)}</p>
-          <a class="btn btn-secondary map-link" href="https://www.google.com/maps/dir/?api=1&destination=${targetStation.location.lat},${targetStation.location.lon}&travelmode=walking" target="_blank" rel="noopener noreferrer">Zu Fuß navigieren</a>
-        </details>
-        <p class="help">Der Standort bleibt auf diesem Handy und wird nicht in Supabase gespeichert.</p>
+        <p><strong>${escapeHtml(targetStation.location.name)}</strong><br>${escapeHtml(targetStation.location.address)}</p>
+        <a class="btn btn-secondary map-link" href="https://www.google.com/maps/dir/?api=1&destination=${targetStation.location.lat},${targetStation.location.lon}&travelmode=walking" target="_blank" rel="noopener noreferrer">Zu Fuß navigieren</a>
+        <p class="help">Die Navigation öffnet sich in eurer Karten-App bzw. im Browser.</p>
       </details>
     `;
   }
@@ -1223,7 +1207,7 @@
           <summary>Hinweis zum Rätsel</summary>
           <p>${escapeHtml(hint)}</p>
         </details>
-        ${renderCompassHelp(targetStation)}
+        ${renderNavigationHelp(targetStation)}
         <button id="reveal${isOpening ? "Arrival" : "Destination"}Button" class="btn btn-danger full-button" type="button">Ziel aufdecken und weiterspielen</button>
       </section>
     `;
@@ -1318,7 +1302,7 @@
                 <summary>Hinweis zur Aufgabe</summary>
                 <p>${escapeHtml(station.taskHint)}</p>
               </details>
-              ${renderCompassHelp(station, "Kompass & Navigation zum Fundort")}
+              ${renderNavigationHelp(station, "Navigation zum Fundort")}
               <button id="revealTaskButton" class="btn btn-danger full-button" type="button">Lösung aufdecken und weiterspielen</button>
             </section>
           ` : `
@@ -1576,16 +1560,10 @@
     else loadStoredStationPhoto(stationId);
   }
 
-  function bindCompassEvents() {
-    const button = document.getElementById("startCompassButton");
-    button?.addEventListener("click", () => startCompass(Number(button.dataset.targetStation)));
-    document.getElementById("stopCompassButton")?.addEventListener("click", stopCompass);
-  }
 
   function bindStationEvents(stationId) {
     const station = STATIONS[stationId - 1];
     const progress = getStationProgress(stationId);
-    bindCompassEvents();
 
     if (stationId === 1 && !progress.arrivalSolved) {
       document.getElementById("checkArrivalButton")?.addEventListener("click", () => checkArrival(station));
@@ -1654,166 +1632,6 @@
     refreshMemoryPhotoStatus();
   }
 
-  function normalizeDegrees(value) {
-    return ((Number(value) % 360) + 360) % 360;
-  }
-
-  function toRadians(value) {
-    return Number(value) * Math.PI / 180;
-  }
-
-  function calculateBearing(fromLat, fromLon, toLat, toLon) {
-    const lat1 = toRadians(fromLat);
-    const lat2 = toRadians(toLat);
-    const deltaLon = toRadians(toLon - fromLon);
-    const y = Math.sin(deltaLon) * Math.cos(lat2);
-    const x = Math.cos(lat1) * Math.sin(lat2) - Math.sin(lat1) * Math.cos(lat2) * Math.cos(deltaLon);
-    return normalizeDegrees(Math.atan2(y, x) * 180 / Math.PI);
-  }
-
-  function calculateDistance(fromLat, fromLon, toLat, toLon) {
-    const earthRadius = 6371000;
-    const deltaLat = toRadians(toLat - fromLat);
-    const deltaLon = toRadians(toLon - fromLon);
-    const lat1 = toRadians(fromLat);
-    const lat2 = toRadians(toLat);
-    const a = Math.sin(deltaLat / 2) ** 2 + Math.cos(lat1) * Math.cos(lat2) * Math.sin(deltaLon / 2) ** 2;
-    return earthRadius * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-  }
-
-  function formatDistance(metres) {
-    if (!Number.isFinite(metres)) return "–";
-    if (metres < 1000) return `${Math.max(0, Math.round(metres / 5) * 5)} m`;
-    return `${(metres / 1000).toFixed(1).replace(".", ",")} km`;
-  }
-
-  function compassDirection(degrees) {
-    const directions = ["N", "NO", "O", "SO", "S", "SW", "W", "NW"];
-    return directions[Math.round(normalizeDegrees(degrees) / 45) % 8];
-  }
-
-  function readDeviceHeading(event) {
-    if (typeof event.webkitCompassHeading === "number") {
-      return normalizeDegrees(event.webkitCompassHeading);
-    }
-    if (typeof event.alpha !== "number") return null;
-    const screenAngle = Number(screen.orientation?.angle ?? window.orientation ?? 0);
-    return normalizeDegrees(360 - event.alpha + screenAngle);
-  }
-
-  function updateCompassDisplay() {
-    const station = STATIONS.find((item) => item.id === state.compassStationId);
-    const needle = document.getElementById("compassNeedle");
-    const distanceElement = document.getElementById("compassDistance");
-    const directionElement = document.getElementById("compassDirection");
-    const accuracyElement = document.getElementById("compassAccuracy");
-    const statusElement = document.getElementById("compassStatus");
-    if (!station || !needle || !distanceElement || !directionElement || !accuracyElement || !statusElement) return;
-
-    if (!state.compassPosition) {
-      statusElement.textContent = "Warte auf den aktuellen Standort …";
-      return;
-    }
-
-    const { latitude, longitude, accuracy } = state.compassPosition.coords;
-    const targetBearing = calculateBearing(latitude, longitude, station.location.lat, station.location.lon);
-    const distance = calculateDistance(latitude, longitude, station.location.lat, station.location.lon);
-    const relativeBearing = state.compassHeading === null
-      ? targetBearing
-      : normalizeDegrees(targetBearing - state.compassHeading);
-
-    needle.style.transform = `translate(-50%, -88%) rotate(${relativeBearing}deg)`;
-    distanceElement.textContent = formatDistance(distance);
-    directionElement.textContent = `${compassDirection(targetBearing)} · ${Math.round(targetBearing)}°`;
-    accuracyElement.textContent = Number.isFinite(accuracy) ? `± ${Math.round(accuracy)} m` : "–";
-
-    if (distance <= Math.max(20, accuracy || 0)) {
-      statusElement.textContent = "Ihr seid sehr nah am Ziel. Schaut euch jetzt in der Umgebung um.";
-    } else if (state.compassHeading === null) {
-      statusElement.textContent = "Standort gefunden. Der Richtungssensor liefert noch keine Werte. Bewegt das Handy kurz in Form einer Acht und haltet es möglichst waagerecht.";
-    } else {
-      statusElement.textContent = "Die rote Spitze zeigt ungefähr zum Ziel. Haltet das Handy möglichst waagerecht.";
-    }
-  }
-
-  async function requestCompassPermission() {
-    if (typeof DeviceOrientationEvent !== "undefined" && typeof DeviceOrientationEvent.requestPermission === "function") {
-      const result = await DeviceOrientationEvent.requestPermission();
-      if (result !== "granted") throw new Error("Kompassfreigabe wurde nicht erteilt.");
-    }
-  }
-
-  async function startCompass(stationId) {
-    const station = STATIONS.find((item) => item.id === stationId);
-    const panel = document.getElementById("compassPanel");
-    const button = document.getElementById("startCompassButton");
-    const status = document.getElementById("compassStatus");
-    if (!station || !panel || !status) return;
-
-    stopCompass(false);
-    state.compassStationId = stationId;
-    state.compassActive = true;
-    panel.hidden = false;
-    if (button) button.textContent = "Kompass neu starten";
-    status.textContent = "Standort und Kompass werden vorbereitet …";
-
-    try {
-      await requestCompassPermission();
-    } catch (error) {
-      state.compassHeading = null;
-      status.textContent = "Die Kompassfreigabe fehlt. Die App kann trotzdem Entfernung und Himmelsrichtung anzeigen.";
-    }
-
-    if (typeof DeviceOrientationEvent !== "undefined") {
-      state.compassOrientationHandler = (event) => {
-        const heading = readDeviceHeading(event);
-        if (heading === null) return;
-        state.compassHeading = heading;
-        updateCompassDisplay();
-      };
-      window.addEventListener("deviceorientationabsolute", state.compassOrientationHandler, true);
-      window.addEventListener("deviceorientation", state.compassOrientationHandler, true);
-    }
-
-    if (!navigator.geolocation) {
-      status.textContent = "Dieses Gerät stellt keinen Standort bereit. Nutzt bitte die Karten-App als Notlösung.";
-      return;
-    }
-
-    state.compassWatchId = navigator.geolocation.watchPosition(
-      (position) => {
-        state.compassPosition = position;
-        updateCompassDisplay();
-      },
-      (error) => {
-        const messages = {
-          1: "Der Standort wurde nicht freigegeben. Erlaubt den Standort in den Browser-Einstellungen oder nutzt die Karten-App.",
-          2: "Der Standort konnte gerade nicht bestimmt werden. Geht möglichst nach draußen und versucht es erneut.",
-          3: "Die Standortbestimmung dauert zu lange. Versucht es erneut oder nutzt die Karten-App."
-        };
-        status.textContent = messages[error.code] || "Der Standort konnte nicht bestimmt werden.";
-      },
-      { enableHighAccuracy: true, maximumAge: 3000, timeout: 15000 }
-    );
-  }
-
-  function stopCompass(hidePanel = true) {
-    if (state.compassWatchId !== null && navigator.geolocation) {
-      navigator.geolocation.clearWatch(state.compassWatchId);
-    }
-    if (state.compassOrientationHandler) {
-      window.removeEventListener("deviceorientationabsolute", state.compassOrientationHandler, true);
-      window.removeEventListener("deviceorientation", state.compassOrientationHandler, true);
-    }
-    state.compassWatchId = null;
-    state.compassOrientationHandler = null;
-    state.compassHeading = null;
-    state.compassPosition = null;
-    state.compassActive = false;
-    if (hidePanel) {
-      document.getElementById("compassPanel")?.setAttribute("hidden", "");
-    }
-  }
 
   function clearPhotoState() {
     if (state.photoUrl) URL.revokeObjectURL(state.photoUrl);
@@ -2130,6 +1948,60 @@
     });
   }
 
+  function drawWaxSeal(ctx, centerX, centerY, radius = 104) {
+    ctx.save();
+    ctx.translate(centerX, centerY);
+
+    // leicht unregelmäßiger Rand wie echtes Siegellack
+    const points = 48;
+    const edge = [];
+    for (let i = 0; i < points; i += 1) {
+      const angle = (Math.PI * 2 * i) / points;
+      const wobble = i % 2 === 0 ? 7 : -3;
+      edge.push({ x: Math.cos(angle) * (radius + wobble), y: Math.sin(angle) * (radius + wobble) });
+    }
+    ctx.beginPath();
+    edge.forEach((point, index) => index === 0 ? ctx.moveTo(point.x, point.y) : ctx.lineTo(point.x, point.y));
+    ctx.closePath();
+    const wax = ctx.createRadialGradient(-34, -42, 15, 0, 0, radius + 14);
+    wax.addColorStop(0, "#a83b49");
+    wax.addColorStop(0.46, "#7b2833");
+    wax.addColorStop(1, "#4f141d");
+    ctx.fillStyle = wax;
+    ctx.shadowColor = "rgba(45,18,20,.34)";
+    ctx.shadowBlur = 18;
+    ctx.shadowOffsetY = 10;
+    ctx.fill();
+    ctx.shadowColor = "transparent";
+
+    ctx.strokeStyle = "#53141d";
+    ctx.lineWidth = 7;
+    ctx.stroke();
+    ctx.strokeStyle = "#d2aa62";
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.arc(0, 0, radius - 21, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.arc(0, 0, radius - 34, 0, Math.PI * 2);
+    ctx.strokeStyle = "rgba(242,223,181,.55)";
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+
+    ctx.textAlign = "center";
+    ctx.fillStyle = "#f2dfb5";
+    ctx.font = canvasFont(24, "Georgia, serif", "bold");
+    ctx.fillText("AKTE 1823", 0, -54);
+    ctx.font = canvasFont(25, "Georgia, serif", "bold");
+    ctx.fillText("✦", 0, -24);
+    ctx.font = canvasFont(31, "Georgia, serif", "bold");
+    ctx.fillText("FALL", 0, 8);
+    ctx.fillText("GELÖST", 0, 43);
+    ctx.font = canvasFont(20, "Georgia, serif", "bold");
+    ctx.fillText("ARCHIV LEER", 0, 73);
+    ctx.restore();
+  }
+
   async function createCertificateMemory() {
     const finalBlob = await getMemoryPhoto("final", "crew");
     if (!finalBlob) {
@@ -2189,26 +2061,7 @@
       ctx.font = canvasFont(31, '"Brush Script MT", "Segoe Script", cursive', "normal", "italic");
       ctx.fillText(dateLabel(), 165, 1543);
 
-      ctx.save();
-      ctx.translate(620, 1515);
-      ctx.fillStyle = "#7b2833";
-      ctx.strokeStyle = "#5b1721";
-      ctx.lineWidth = 8;
-      ctx.beginPath();
-      ctx.arc(0, 0, 100, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.stroke();
-      ctx.strokeStyle = "#d2aa62";
-      ctx.lineWidth = 3;
-      ctx.beginPath();
-      ctx.arc(0, 0, 80, 0, Math.PI * 2);
-      ctx.stroke();
-      ctx.fillStyle = "#f2dfb5";
-      ctx.textAlign = "center";
-      ctx.font = canvasFont(27, "Georgia, serif", "bold");
-      ctx.fillText("AKTE", 0, -10);
-      ctx.fillText("GESCHLOSSEN", 0, 30);
-      ctx.restore();
+      drawWaxSeal(ctx, 620, 1515, 104);
 
       ctx.textAlign = "right";
       ctx.fillStyle = "rgba(76,67,54,.62)";
@@ -2247,7 +2100,7 @@
 
       const canvas = document.createElement("canvas");
       canvas.width = 1600;
-      canvas.height = 2200;
+      canvas.height = 2600;
       const ctx = canvas.getContext("2d");
       drawParchment(ctx, canvas.width, canvas.height);
       drawDecorativeBorder(ctx, canvas.width, canvas.height, 24);
@@ -2332,6 +2185,7 @@
       roundRectPath(ctx, 82, bottomY, 1436, 180, 20);
       ctx.fill();
       ctx.strokeStyle = "rgba(123,40,51,.35)";
+      ctx.lineWidth = 2;
       ctx.stroke();
       ctx.textAlign = "left";
       ctx.fillStyle = "#7b2833";
@@ -2341,21 +2195,30 @@
       ctx.font = canvasFont(30, "Georgia, serif", "bold");
       wrapCanvasText(ctx, "11  +  JULI  +  1823  +  GEORG IV.  +  FLECKEN LEER  +  RECHTE EINER STADT", 110, bottomY + 92, 1350, 42, 2);
 
-      const finalY = bottomY + 220;
-      drawFramedPhoto(ctx, finalImage, 1045, finalY, 425, 275);
-      ctx.textAlign = "left";
-      ctx.fillStyle = "#173f35";
-      ctx.font = canvasFont(44, '"Brush Script MT", "Segoe Script", cursive', "normal", "italic");
-      ctx.fillText(crewName, 1060, finalY + 330);
+      // Vollständiger Abschlussbereich – bewusst mit genügend Abstand zum unteren Rand.
+      const finalY = bottomY + 215;
+      ctx.fillStyle = "rgba(255,250,238,.72)";
+      roundRectPath(ctx, 82, finalY, 1436, 445, 22);
+      ctx.fill();
+      ctx.strokeStyle = "rgba(97,76,47,.36)";
+      ctx.lineWidth = 2;
+      ctx.stroke();
 
+      ctx.textAlign = "left";
       ctx.fillStyle = "#7b2833";
-      ctx.font = canvasFont(38, "Georgia, serif", "bold");
-      ctx.fillText("6 Spuren verfolgt", 110, finalY + 55);
-      ctx.fillText("6 Beweise gesichert", 110, finalY + 110);
-      ctx.fillText("Fall gelöst!", 110, finalY + 165);
+      ctx.font = canvasFont(34, "Georgia, serif", "bold");
+      ctx.fillText("✓  6 Spuren verfolgt", 120, finalY + 76);
+      ctx.fillText("✓  6 Beweise gesichert", 120, finalY + 132);
+      ctx.fillText("✓  Fall gelöst", 120, finalY + 188);
+
       ctx.fillStyle = "#28342f";
       ctx.font = canvasFont(27, "Georgia, serif", "bold");
-      wrapCanvasText(ctx, "Am 11. Juli 1823 verlieh König Georg IV. dem Flecken Leer die Rechte einer Stadt.", 110, finalY + 235, 820, 40, 3);
+      wrapCanvasText(ctx, "Am 11. Juli 1823 verlieh König Georg IV. dem Flecken Leer die Rechte einer Stadt.", 120, finalY + 260, 790, 40, 3);
+
+      drawFramedPhoto(ctx, finalImage, 1045, finalY + 55, 425, 275);
+      ctx.fillStyle = "#173f35";
+      ctx.font = canvasFont(44, '"Brush Script MT", "Segoe Script", cursive', "normal", "italic");
+      ctx.fillText(crewName, 1060, finalY + 385);
 
       const blob = await canvasToBlob(canvas, "image/png");
       showGeneratedMemory("Ermittlungskarte – Akte 1823", blob, `Akte-1823-Ermittlungskarte-${safeFileName(crewName)}.png`, "image");
@@ -2651,7 +2514,6 @@
     if (!state.user) initSupabase();
   });
   window.addEventListener("offline", () => setConnection("Offline", "offline"));
-  window.addEventListener("pagehide", () => stopCompass(false));
 
   window.addEventListener("load", () => {
     if ("serviceWorker" in navigator) {
