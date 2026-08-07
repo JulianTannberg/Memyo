@@ -1,11 +1,14 @@
 (() => {
   "use strict";
 
-  const APP_VERSION = "3.0.3";
+  const APP_VERSION = "3.1.0";
   const STORAGE_KEY = "akte1823.game";
   const SNAPSHOT_KEY = "akte1823.game.snapshot";
   const RECENT_GAMES_KEY = "akte1823.recentGames";
   const CODE_CHARS = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+  const PHOTO_DB_NAME = "akte1823-photos";
+  const PHOTO_STORE_NAME = "photos";
+  const PHOTO_DB_VERSION = 1;
 
   const DEFAULT_SETUP = {
     crewName: ""
@@ -181,6 +184,16 @@
     }
   ];
 
+
+  const ARCHIVE_NOTES = {
+    1: "Teelke steht für die ostfriesische Teekultur und den traditionsreichen Leeraner Teehandel.",
+    2: "Auf der Großen Kirche dreht sich das Schepken Christi – ein dreimastiges Schiff hoch über den Dächern Leers.",
+    3: "Das Hermann-Tempel-Haus war einst ein Speicher. Heute werden dort in der Stadtbibliothek Wissen, Bücher und Geschichten gesammelt.",
+    4: "Haus Samson erinnert mit Samson und dem Löwen an alte Handelswege und die Geschichte eines der bekanntesten Häuser der Altstadt.",
+    5: "Im Stadtwappen steht das L für Leer. Das Historische Rathaus entstand erst Jahrzehnte nach der Stadterhebung.",
+    6: "Die Alte Waage erzählt vom Handel am Wasser. Waagschalen an der Fassade erinnern daran, dass hier Waren gewogen wurden."
+  };
+
   const state = {
     client: null,
     user: null,
@@ -200,7 +213,10 @@
     compassOrientationHandler: null,
     compassActive: false,
     connecting: false,
-    lastConnectionError: null
+    lastConnectionError: null,
+    memoryOutputUrl: "",
+    memoryVideoUrl: "",
+    slideshowTimer: null
   };
 
   const app = document.getElementById("app");
@@ -1067,22 +1083,25 @@
 
     return `
       <section class="game-head">
-        <div class="game-head-top">
-          <div>
+        <div class="game-head-top compact-game-head">
+          <div class="crew-summary">
             <div class="game-label">Crew</div>
             <div class="game-code crew-code">${escapeHtml(crewName)}</div>
           </div>
-        </div>
-        <div class="game-code-panel">
-          <div class="game-code-main">
-            <div class="game-label">Spielcode</div>
-            <div class="game-code game-code-visible">${escapeHtml(state.game.code)}</div>
-            <div class="game-code-help">Diesen Code könnt ihr einfach vorlesen und unter „Mit Code beitreten“ eingeben.</div>
-          </div>
-          <div class="game-share-actions">
-            <button id="copyCodeButton" class="btn btn-secondary" type="button">Code kopieren</button>
-            <button id="shareLinkButton" class="btn btn-secondary" type="button">Link teilen</button>
-          </div>
+          <details class="game-code-details">
+            <summary>Spielcode anzeigen</summary>
+            <div class="game-code-panel">
+              <div class="game-code-main">
+                <div class="game-label">Spielcode</div>
+                <div class="game-code game-code-visible">${escapeHtml(state.game.code)}</div>
+                <div class="game-code-help">Diesen Code könnt ihr vorlesen oder unter „Mit Code beitreten“ eingeben.</div>
+              </div>
+              <div class="game-share-actions">
+                <button id="copyCodeButton" class="btn btn-secondary" type="button">Code kopieren</button>
+                <button id="shareLinkButton" class="btn btn-secondary" type="button">Link teilen</button>
+              </div>
+            </div>
+          </details>
         </div>
         <div class="progress-wrap"><div class="progress-list">${steps}</div></div>
       </section>
@@ -1227,7 +1246,7 @@
             <button id="sharePhotoButton" class="btn btn-secondary" type="button">Foto speichern oder teilen</button>
             <a id="downloadPhotoLink" class="btn btn-text" download>Als Datei herunterladen</a>
           </div>
-          <p class="help">Die Fotoaufgabe blockiert das Spiel nicht. Das Foto wird nicht hochgeladen und bleibt auf diesem Gerät.</p>
+          <p class="help">Die Fotoaufgabe blockiert das Spiel nicht. Das Foto wird nicht hochgeladen und auf diesem Gerät für Urkunde, Ermittlungskarte und Slideshow gespeichert.</p>
         </div>
       </details>
     `;
@@ -1336,22 +1355,107 @@
     }, 0) + Number(Boolean(finalState.revealed));
 
     return `
-      <section class="final-card">
-        <p class="eyebrow">Akte vollständig</p>
-        <h1 class="final-title">Der entscheidende Satz</h1>
+      <section class="final-card memory-finale">
+        <p class="eyebrow">Akte geschlossen</p>
+        <h1 class="final-title">Fall gelöst!</h1>
         <div class="final-statement">
           Am <strong>11. Juli 1823</strong> verlieh König <strong>Georg IV.</strong> dem Flecken Leer die Rechte einer Stadt.
         </div>
-        <p>Das Historische Rathaus konnte damals noch nicht dort stehen: Es wurde erst 1894 eingeweiht.</p>
-        <p>Die Spurensuche der Crew <strong>${escapeHtml(setup.crewName || "Unbekannt")}</strong> ist abgeschlossen.</p>
-        ${assistedSteps ? `<p class="assistance-summary">${assistedSteps} Lösung${assistedSteps === 1 ? " wurde" : "en wurden"} mithilfe der Notfallauflösung geöffnet. Das Spiel ist trotzdem vollständig abgeschlossen.</p>` : `<p class="assistance-summary success">Alle entscheidenden Schritte wurden ohne Aufdecken gelöst.</p>`}
+        <p>Die Spurensuche der Crew <strong class="crew-script-inline">${escapeHtml(setup.crewName || "Crew")}</strong> ist abgeschlossen.</p>
+        ${assistedSteps ? `<p class="assistance-summary">${assistedSteps} Lösung${assistedSteps === 1 ? " wurde" : "en wurden"} mithilfe der Notfallauflösung geöffnet. Die Erinnerungen können trotzdem vollständig erstellt werden.</p>` : `<p class="assistance-summary success">Alle entscheidenden Schritte wurden ohne Aufdecken gelöst.</p>`}
 
-        <section class="section">
-          <h2 class="section-title">Gesammelte Beweisstücke</h2>
-          ${renderEvidenceCards(STATIONS.map((station) => station.evidence))}
+        <section class="section memory-step">
+          <div class="memory-step-number">1</div>
+          <div>
+            <h2 class="memory-heading">Gemeinsames Abschlussfoto</h2>
+            <p>Zum Schluss braucht die Urkunde ein Foto der ganzen Crew. Nehmt jetzt eines auf oder wählt ein vorhandenes Foto aus.</p>
+          </div>
+          <div id="finalCrewPhotoCard" class="final-photo-card">
+            <div id="finalCrewPhotoPlaceholder" class="final-photo-placeholder">
+              <span aria-hidden="true">◎</span>
+              <strong>Noch kein Abschlussfoto</strong>
+            </div>
+            <img id="finalCrewPhotoPreview" alt="Abschlussfoto der Crew" hidden>
+          </div>
+          <div class="photo-actions">
+            <button id="takeFinalPhotoButton" class="btn btn-primary" type="button">Abschlussfoto aufnehmen</button>
+            <button id="chooseFinalPhotoButton" class="btn btn-secondary" type="button">Aus Galerie wählen</button>
+          </div>
+          <input id="finalCrewCameraInput" type="file" accept="image/*" capture="environment" hidden>
+          <input id="finalCrewGalleryInput" type="file" accept="image/*" hidden>
+          <p class="help">Das Foto wird nicht hochgeladen. Es wird nur auf diesem Gerät für eure Erinnerungen gespeichert.</p>
         </section>
 
-        <div class="actions two">
+        <section class="section memory-step">
+          <div class="memory-step-number">2</div>
+          <div>
+            <h2 class="memory-heading">Beweisfotos prüfen</h2>
+            <p>Stationsfotos, die auf diesem Handy aufgenommen wurden, erscheinen automatisch. Fehlende Fotos könnt ihr jetzt aus der Galerie ergänzen.</p>
+          </div>
+          <div id="memoryPhotoChecklist" class="memory-photo-checklist">
+            ${STATIONS.map((station) => `
+              <div class="memory-photo-row" data-memory-station="${station.id}">
+                <div class="memory-photo-number">${station.id}</div>
+                <div class="memory-photo-copy">
+                  <strong>${escapeHtml(station.title)}</strong>
+                  <span id="memoryPhotoStatus-${station.id}">Foto wird geprüft …</span>
+                </div>
+                <button class="btn btn-secondary memory-add-photo" type="button" data-memory-station="${station.id}">Foto ergänzen</button>
+                <input id="memoryPhotoInput-${station.id}" data-memory-station="${station.id}" type="file" accept="image/*" hidden>
+              </div>
+            `).join("")}
+          </div>
+        </section>
+
+        <section class="section memory-step">
+          <div class="memory-step-number">3</div>
+          <div>
+            <h2 class="memory-heading">Eure Erinnerungen</h2>
+            <p>Der Crew-Name wird auf Urkunde und Ermittlungskarte in Schreibschrift gesetzt. Die Dokumente werden direkt auf diesem Gerät erzeugt.</p>
+          </div>
+          <div class="memory-choice-grid">
+            <button id="createCertificateButton" class="memory-choice" type="button" disabled>
+              <span class="memory-choice-icon">✦</span>
+              <strong>Urkunde erstellen</strong>
+              <small>mit Crew-Foto, historischem Schlusssatz und Siegel</small>
+            </button>
+            <button id="createCaseMapButton" class="memory-choice" type="button" disabled>
+              <span class="memory-choice-icon">⌘</span>
+              <strong>Ermittlungskarte erstellen</strong>
+              <small>alle 6 Stationen, Beweise, Geschichte und Fotos</small>
+            </button>
+            <button id="openSlideshowButton" class="memory-choice" type="button" disabled>
+              <span class="memory-choice-icon">▶</span>
+              <strong>Slideshow / Video</strong>
+              <small>Hochformat für eine kurze Erinnerung zum Teilen</small>
+            </button>
+          </div>
+        </section>
+
+        <section id="generatedMemoryPanel" class="section generated-memory" hidden>
+          <h2 id="generatedMemoryTitle" class="memory-heading">Erinnerung</h2>
+          <img id="generatedMemoryImage" alt="Erstellte Erinnerung" hidden>
+          <video id="generatedMemoryVideo" controls playsinline hidden></video>
+          <div class="actions two">
+            <a id="downloadMemoryButton" class="btn btn-primary" download>Speichern</a>
+            <button id="shareMemoryButton" class="btn btn-secondary" type="button">Teilen</button>
+          </div>
+        </section>
+
+        <section id="slideshowPanel" class="section slideshow-panel" hidden>
+          <h2 class="memory-heading">Akte 1823 – Slideshow</h2>
+          <div class="slideshow-stage">
+            <canvas id="slideshowCanvas" width="720" height="1280" aria-label="Vorschau der Slideshow"></canvas>
+          </div>
+          <p id="slideshowStatus" class="help">Die Vorschau läuft automatisch ohne Musik.</p>
+          <div class="actions two">
+            <button id="replaySlideshowButton" class="btn btn-secondary" type="button">Nochmal ansehen</button>
+            <button id="createVideoButton" class="btn btn-primary" type="button">Video speichern</button>
+          </div>
+          <p class="help">Je nach Browser wird das Video als MP4 oder WebM erzeugt. Falls Videoexport auf diesem Handy nicht unterstützt wird, bleibt die Slideshow-Vorschau nutzbar.</p>
+        </section>
+
+        <div class="actions two final-nav-actions">
           <button id="newSeparateGameButton" class="btn btn-primary" type="button">Neues Spiel anlegen</button>
           <button id="finalHomeButton" class="btn btn-secondary" type="button">Zur Startseite</button>
         </div>
@@ -1469,6 +1573,7 @@
     document.getElementById("galleryInput")?.addEventListener("change", (event) => handlePhotoSelected(event, stationId));
     document.getElementById("sharePhotoButton")?.addEventListener("click", sharePhoto);
     if (state.photoFile && state.photoStationId === stationId) showPhotoPreview();
+    else loadStoredStationPhoto(stationId);
   }
 
   function bindCompassEvents() {
@@ -1526,6 +1631,27 @@
       }
     });
     document.getElementById("finalHomeButton")?.addEventListener("click", returnHomeKeepingGame);
+
+    document.getElementById("takeFinalPhotoButton")?.addEventListener("click", () => document.getElementById("finalCrewCameraInput")?.click());
+    document.getElementById("chooseFinalPhotoButton")?.addEventListener("click", () => document.getElementById("finalCrewGalleryInput")?.click());
+    document.getElementById("finalCrewCameraInput")?.addEventListener("change", handleFinalCrewPhotoSelected);
+    document.getElementById("finalCrewGalleryInput")?.addEventListener("change", handleFinalCrewPhotoSelected);
+
+    document.querySelectorAll(".memory-add-photo").forEach((button) => {
+      button.addEventListener("click", () => document.getElementById(`memoryPhotoInput-${button.dataset.memoryStation}`)?.click());
+    });
+    document.querySelectorAll("[id^='memoryPhotoInput-']").forEach((input) => {
+      input.addEventListener("change", handleMemoryStationPhotoSelected);
+    });
+
+    document.getElementById("createCertificateButton")?.addEventListener("click", createCertificateMemory);
+    document.getElementById("createCaseMapButton")?.addEventListener("click", createCaseMapMemory);
+    document.getElementById("openSlideshowButton")?.addEventListener("click", openSlideshowPanel);
+    document.getElementById("replaySlideshowButton")?.addEventListener("click", playSlideshowPreview);
+    document.getElementById("createVideoButton")?.addEventListener("click", createMemoryVideo);
+    document.getElementById("shareMemoryButton")?.addEventListener("click", shareGeneratedMemory);
+
+    refreshMemoryPhotoStatus();
   }
 
   function normalizeDegrees(value) {
@@ -1696,13 +1822,20 @@
     state.photoStationId = null;
   }
 
-  function handlePhotoSelected(event, stationId) {
+  async function handlePhotoSelected(event, stationId) {
     const file = event.target.files?.[0];
     if (!file) return;
     clearPhotoState();
     state.photoFile = file;
     state.photoUrl = URL.createObjectURL(file);
     state.photoStationId = stationId;
+    try {
+      await saveMemoryPhoto("station", stationId, file);
+      showToast("Foto für eure Abschluss-Erinnerung gespeichert.", 2600);
+    } catch (error) {
+      console.warn("Foto konnte nicht dauerhaft gespeichert werden:", error);
+      showToast("Foto ist geöffnet, konnte aber nicht dauerhaft im Browser gespeichert werden.", 4200);
+    }
     showPhotoPreview();
   }
 
@@ -1737,6 +1870,716 @@
         document.getElementById("downloadPhotoLink")?.click();
         showToast("Teilen war nicht möglich. Das Foto wurde als Datei angeboten.");
       }
+    }
+  }
+
+
+  function openPhotoDatabase() {
+    return new Promise((resolve, reject) => {
+      if (!window.indexedDB) {
+        reject(new Error("IndexedDB wird auf diesem Gerät nicht unterstützt."));
+        return;
+      }
+      const request = indexedDB.open(PHOTO_DB_NAME, PHOTO_DB_VERSION);
+      request.onupgradeneeded = () => {
+        const db = request.result;
+        if (!db.objectStoreNames.contains(PHOTO_STORE_NAME)) {
+          db.createObjectStore(PHOTO_STORE_NAME, { keyPath: "key" });
+        }
+      };
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => reject(request.error || new Error("Fotospeicher konnte nicht geöffnet werden."));
+    });
+  }
+
+  function memoryPhotoKey(kind, stationId = "final") {
+    return `${state.game?.id || "unknown"}:${kind}:${stationId}`;
+  }
+
+  async function saveMemoryPhoto(kind, stationId, blob) {
+    const db = await openPhotoDatabase();
+    const key = memoryPhotoKey(kind, stationId);
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(PHOTO_STORE_NAME, "readwrite");
+      tx.objectStore(PHOTO_STORE_NAME).put({
+        key,
+        gameId: state.game?.id || "",
+        kind,
+        stationId,
+        blob,
+        updatedAt: Date.now()
+      });
+      tx.oncomplete = () => { db.close(); resolve(true); };
+      tx.onerror = () => { db.close(); reject(tx.error || new Error("Foto konnte nicht gespeichert werden.")); };
+    });
+  }
+
+  async function getMemoryPhoto(kind, stationId = "final") {
+    let db;
+    try {
+      db = await openPhotoDatabase();
+    } catch {
+      return null;
+    }
+    const key = memoryPhotoKey(kind, stationId);
+    return new Promise((resolve) => {
+      const tx = db.transaction(PHOTO_STORE_NAME, "readonly");
+      const request = tx.objectStore(PHOTO_STORE_NAME).get(key);
+      request.onsuccess = () => resolve(request.result?.blob || null);
+      request.onerror = () => resolve(null);
+      tx.oncomplete = () => db.close();
+    });
+  }
+
+  async function loadStoredStationPhoto(stationId) {
+    const blob = await getMemoryPhoto("station", stationId);
+    if (!blob || state.photoFile || state.photoStationId === stationId) return;
+    clearPhotoState();
+    const file = new File([blob], `akte-1823-station-${stationId}.jpg`, { type: blob.type || "image/jpeg" });
+    state.photoFile = file;
+    state.photoUrl = URL.createObjectURL(file);
+    state.photoStationId = stationId;
+    showPhotoPreview();
+  }
+
+  async function handleFinalCrewPhotoSelected(event) {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    try {
+      await saveMemoryPhoto("final", "crew", file);
+      await refreshMemoryPhotoStatus();
+      showToast("Abschlussfoto gespeichert.");
+    } catch (error) {
+      console.error(error);
+      showToast("Das Abschlussfoto konnte auf diesem Gerät nicht gespeichert werden.", 4200);
+    }
+  }
+
+  async function handleMemoryStationPhotoSelected(event) {
+    const file = event.target.files?.[0];
+    const stationId = Number(event.currentTarget?.dataset.memoryStation);
+    if (!file || !stationId) return;
+    try {
+      await saveMemoryPhoto("station", stationId, file);
+      await refreshMemoryPhotoStatus();
+      showToast(`Foto für Akte ${stationId} gespeichert.`);
+    } catch (error) {
+      console.error(error);
+      showToast("Das Foto konnte auf diesem Gerät nicht gespeichert werden.", 4200);
+    }
+  }
+
+  async function refreshMemoryPhotoStatus() {
+    if (!state.game || Number(state.game.current_station || 0) < 7) return;
+    const finalPhoto = await getMemoryPhoto("final", "crew");
+    const finalPreview = document.getElementById("finalCrewPhotoPreview");
+    const finalPlaceholder = document.getElementById("finalCrewPhotoPlaceholder");
+    if (finalPhoto && finalPreview) {
+      if (finalPreview.dataset.objectUrl) URL.revokeObjectURL(finalPreview.dataset.objectUrl);
+      const url = URL.createObjectURL(finalPhoto);
+      finalPreview.dataset.objectUrl = url;
+      finalPreview.src = url;
+      finalPreview.hidden = false;
+      if (finalPlaceholder) finalPlaceholder.hidden = true;
+    } else {
+      if (finalPreview) finalPreview.hidden = true;
+      if (finalPlaceholder) finalPlaceholder.hidden = false;
+    }
+
+    for (const station of STATIONS) {
+      const blob = await getMemoryPhoto("station", station.id);
+      const status = document.getElementById(`memoryPhotoStatus-${station.id}`);
+      const button = document.querySelector(`.memory-add-photo[data-memory-station="${station.id}"]`);
+      if (status) status.textContent = blob ? "Beweisfoto vorhanden" : "Noch kein Foto auf diesem Handy";
+      if (button) button.textContent = blob ? "Ersetzen" : "Foto ergänzen";
+    }
+
+    document.querySelectorAll("#createCertificateButton, #createCaseMapButton, #openSlideshowButton").forEach((button) => {
+      button.disabled = !finalPhoto;
+    });
+  }
+
+  function dateLabel() {
+    return new Date().toLocaleDateString("de-DE");
+  }
+
+  function canvasFont(size, family = "serif", weight = "normal", style = "normal") {
+    return `${style} ${weight} ${size}px ${family}`;
+  }
+
+  function wrapCanvasText(ctx, text, x, y, maxWidth, lineHeight, maxLines = 20) {
+    const words = String(text || "").split(/\s+/).filter(Boolean);
+    let line = "";
+    let lines = 0;
+    for (let i = 0; i < words.length; i += 1) {
+      const test = line ? `${line} ${words[i]}` : words[i];
+      if (ctx.measureText(test).width > maxWidth && line) {
+        ctx.fillText(line, x, y + lines * lineHeight);
+        line = words[i];
+        lines += 1;
+        if (lines >= maxLines) return y + lines * lineHeight;
+      } else {
+        line = test;
+      }
+    }
+    if (line && lines < maxLines) {
+      ctx.fillText(line, x, y + lines * lineHeight);
+      lines += 1;
+    }
+    return y + lines * lineHeight;
+  }
+
+  function drawParchment(ctx, width, height) {
+    const gradient = ctx.createLinearGradient(0, 0, width, height);
+    gradient.addColorStop(0, "#fbf5e7");
+    gradient.addColorStop(0.52, "#eee0c4");
+    gradient.addColorStop(1, "#f7eedc");
+    ctx.fillStyle = gradient;
+    ctx.fillRect(0, 0, width, height);
+    ctx.save();
+    ctx.globalAlpha = 0.08;
+    for (let i = 0; i < 750; i += 1) {
+      const x = Math.random() * width;
+      const y = Math.random() * height;
+      const r = 0.5 + Math.random() * 2.2;
+      ctx.fillStyle = i % 3 === 0 ? "#7b2833" : "#6f5a33";
+      ctx.beginPath();
+      ctx.arc(x, y, r, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.restore();
+  }
+
+  function drawDecorativeBorder(ctx, width, height, inset = 28) {
+    ctx.save();
+    ctx.strokeStyle = "#173f35";
+    ctx.lineWidth = 18;
+    ctx.strokeRect(inset, inset, width - inset * 2, height - inset * 2);
+    ctx.strokeStyle = "#b08a45";
+    ctx.lineWidth = 5;
+    ctx.strokeRect(inset + 18, inset + 18, width - (inset + 18) * 2, height - (inset + 18) * 2);
+    ctx.strokeStyle = "rgba(123,40,51,.55)";
+    ctx.lineWidth = 2;
+    ctx.strokeRect(inset + 30, inset + 30, width - (inset + 30) * 2, height - (inset + 30) * 2);
+    ctx.restore();
+  }
+
+  async function blobToImage(blob) {
+    if (!blob) return null;
+    const url = URL.createObjectURL(blob);
+    try {
+      const image = await new Promise((resolve, reject) => {
+        const img = new Image();
+        img.onload = () => resolve(img);
+        img.onerror = reject;
+        img.src = url;
+      });
+      return image;
+    } finally {
+      URL.revokeObjectURL(url);
+    }
+  }
+
+  function drawCoverImage(ctx, image, x, y, width, height) {
+    if (!image) return;
+    const scale = Math.max(width / image.width, height / image.height);
+    const sw = width / scale;
+    const sh = height / scale;
+    const sx = (image.width - sw) / 2;
+    const sy = (image.height - sh) / 2;
+    ctx.drawImage(image, sx, sy, sw, sh, x, y, width, height);
+  }
+
+  function roundRectPath(ctx, x, y, width, height, radius) {
+    const r = Math.min(radius, width / 2, height / 2);
+    ctx.beginPath();
+    ctx.moveTo(x + r, y);
+    ctx.arcTo(x + width, y, x + width, y + height, r);
+    ctx.arcTo(x + width, y + height, x, y + height, r);
+    ctx.arcTo(x, y + height, x, y, r);
+    ctx.arcTo(x, y, x + width, y, r);
+    ctx.closePath();
+  }
+
+  function drawFramedPhoto(ctx, image, x, y, width, height) {
+    ctx.save();
+    ctx.fillStyle = "rgba(255,255,255,.68)";
+    roundRectPath(ctx, x - 12, y - 12, width + 24, height + 24, 12);
+    ctx.fill();
+    ctx.strokeStyle = "#b08a45";
+    ctx.lineWidth = 4;
+    ctx.stroke();
+    roundRectPath(ctx, x, y, width, height, 7);
+    ctx.clip();
+    if (image) {
+      drawCoverImage(ctx, image, x, y, width, height);
+    } else {
+      ctx.fillStyle = "#e7dcc8";
+      ctx.fillRect(x, y, width, height);
+      ctx.fillStyle = "#6e746f";
+      ctx.font = canvasFont(Math.max(22, width * 0.05), "sans-serif", "bold");
+      ctx.textAlign = "center";
+      ctx.fillText("Beweisfoto nicht vorhanden", x + width / 2, y + height / 2);
+    }
+    ctx.restore();
+  }
+
+  async function canvasToBlob(canvas, type = "image/png", quality = 0.94) {
+    return new Promise((resolve, reject) => {
+      canvas.toBlob((blob) => blob ? resolve(blob) : reject(new Error("Bild konnte nicht erstellt werden.")), type, quality);
+    });
+  }
+
+  async function createCertificateMemory() {
+    const finalBlob = await getMemoryPhoto("final", "crew");
+    if (!finalBlob) {
+      showToast("Bitte zuerst ein gemeinsames Abschlussfoto aufnehmen.");
+      return;
+    }
+    setBusy(true);
+    try {
+      const image = await blobToImage(finalBlob);
+      const canvas = document.createElement("canvas");
+      canvas.width = 1240;
+      canvas.height = 1754;
+      const ctx = canvas.getContext("2d");
+      drawParchment(ctx, canvas.width, canvas.height);
+      drawDecorativeBorder(ctx, canvas.width, canvas.height, 24);
+
+      ctx.textAlign = "center";
+      ctx.fillStyle = "#173f35";
+      ctx.font = canvasFont(92, "Georgia, serif", "bold");
+      ctx.fillText("AKTE 1823", 620, 175);
+      ctx.fillStyle = "#7b2833";
+      ctx.font = canvasFont(66, "Georgia, serif", "normal");
+      ctx.fillText("Urkunde", 620, 250);
+
+      ctx.fillStyle = "#24332d";
+      ctx.font = canvasFont(30, "Georgia, serif");
+      ctx.fillText("Diese Crew hat die Spuren durch Leer erfolgreich verfolgt", 620, 312);
+      ctx.fillText("und die Akte 1823 gelöst.", 620, 352);
+
+      const crewName = normalizeSetup(state.game.setup).crewName || "Crew";
+      ctx.fillStyle = "#173f35";
+      ctx.font = canvasFont(78, '"Brush Script MT", "Segoe Script", cursive', "normal", "italic");
+      ctx.fillText(crewName, 620, 455);
+
+      drawFramedPhoto(ctx, image, 165, 520, 910, 520);
+
+      ctx.fillStyle = "#173f35";
+      ctx.font = canvasFont(30, "Georgia, serif", "bold");
+      ctx.fillText("6 Spuren verfolgt  •  6 Beweise gesichert  •  Fall gelöst", 620, 1105);
+
+      ctx.fillStyle = "rgba(255,255,255,.35)";
+      roundRectPath(ctx, 145, 1160, 950, 250, 26);
+      ctx.fill();
+      ctx.strokeStyle = "rgba(23,63,53,.45)";
+      ctx.lineWidth = 3;
+      ctx.stroke();
+      ctx.fillStyle = "#6f222d";
+      ctx.font = canvasFont(38, "Georgia, serif", "bold");
+      ctx.fillText("Am 11. Juli 1823 verlieh", 620, 1230);
+      ctx.fillText("König Georg IV. dem Flecken Leer", 620, 1285);
+      ctx.fillText("die Rechte einer Stadt.", 620, 1340);
+
+      ctx.textAlign = "left";
+      ctx.fillStyle = "#3b403d";
+      ctx.font = canvasFont(24, "Georgia, serif");
+      ctx.fillText("Datum", 165, 1500);
+      ctx.font = canvasFont(31, '"Brush Script MT", "Segoe Script", cursive', "normal", "italic");
+      ctx.fillText(dateLabel(), 165, 1543);
+
+      ctx.save();
+      ctx.translate(620, 1515);
+      ctx.fillStyle = "#7b2833";
+      ctx.strokeStyle = "#5b1721";
+      ctx.lineWidth = 8;
+      ctx.beginPath();
+      ctx.arc(0, 0, 100, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+      ctx.strokeStyle = "#d2aa62";
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.arc(0, 0, 80, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.fillStyle = "#f2dfb5";
+      ctx.textAlign = "center";
+      ctx.font = canvasFont(27, "Georgia, serif", "bold");
+      ctx.fillText("AKTE", 0, -10);
+      ctx.fillText("GESCHLOSSEN", 0, 30);
+      ctx.restore();
+
+      ctx.textAlign = "right";
+      ctx.fillStyle = "rgba(76,67,54,.62)";
+      ctx.font = canvasFont(25, "Georgia, serif", "bold");
+      ctx.fillText("ARCHIV 1823 · LEER", 1065, 1540);
+
+      const blob = await canvasToBlob(canvas, "image/png");
+      showGeneratedMemory("Urkunde – Akte 1823", blob, `Akte-1823-Urkunde-${safeFileName(crewName)}.png`, "image");
+    } catch (error) {
+      console.error(error);
+      showToast("Die Urkunde konnte auf diesem Gerät nicht erstellt werden.", 4500);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  function shortStationTitle(station) {
+    if (station.id === 3) return "HERMANN-TEMPEL-HAUS";
+    if (station.id === 6) return "ALTE WAAGE / HAFEN";
+    return station.title.toUpperCase();
+  }
+
+  async function createCaseMapMemory() {
+    const finalBlob = await getMemoryPhoto("final", "crew");
+    if (!finalBlob) {
+      showToast("Bitte zuerst ein gemeinsames Abschlussfoto aufnehmen.");
+      return;
+    }
+    setBusy(true);
+    try {
+      const finalImage = await blobToImage(finalBlob);
+      const stationImages = [];
+      for (const station of STATIONS) {
+        stationImages.push(await blobToImage(await getMemoryPhoto("station", station.id)));
+      }
+
+      const canvas = document.createElement("canvas");
+      canvas.width = 1600;
+      canvas.height = 2200;
+      const ctx = canvas.getContext("2d");
+      drawParchment(ctx, canvas.width, canvas.height);
+      drawDecorativeBorder(ctx, canvas.width, canvas.height, 24);
+
+      const crewName = normalizeSetup(state.game.setup).crewName || "Crew";
+      ctx.textAlign = "left";
+      ctx.fillStyle = "#173f35";
+      ctx.font = canvasFont(66, "Georgia, serif", "bold");
+      ctx.fillText("ERMITTLUNGSKARTE", 85, 125);
+      ctx.fillStyle = "#7b2833";
+      ctx.font = canvasFont(58, "Georgia, serif", "bold");
+      ctx.fillText("AKTE 1823", 1015, 125);
+      ctx.fillStyle = "#28342f";
+      ctx.font = canvasFont(28, "Georgia, serif");
+      ctx.fillText("DER CREW", 88, 182);
+      ctx.font = canvasFont(48, '"Brush Script MT", "Segoe Script", cursive', "normal", "italic");
+      ctx.fillStyle = "#173f35";
+      ctx.fillText(crewName, 245, 185);
+      ctx.textAlign = "right";
+      ctx.font = canvasFont(26, "Georgia, serif");
+      ctx.fillText(`DATUM: ${dateLabel()}`, 1505, 182);
+
+      const marginX = 82;
+      const gapX = 34;
+      const cardW = (canvas.width - marginX * 2 - gapX) / 2;
+      const cardH = 505;
+      const startY = 245;
+      const gapY = 30;
+
+      for (let i = 0; i < STATIONS.length; i += 1) {
+        const station = STATIONS[i];
+        const col = i % 2;
+        const row = Math.floor(i / 2);
+        const x = marginX + col * (cardW + gapX);
+        const y = startY + row * (cardH + gapY);
+
+        ctx.save();
+        ctx.fillStyle = "rgba(255,250,238,.78)";
+        ctx.strokeStyle = "rgba(97,76,47,.42)";
+        ctx.lineWidth = 2;
+        roundRectPath(ctx, x, y, cardW, cardH, 18);
+        ctx.fill();
+        ctx.stroke();
+
+        ctx.fillStyle = "#7b2833";
+        ctx.beginPath();
+        ctx.arc(x + 48, y + 48, 31, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = "#fff7e7";
+        ctx.font = canvasFont(28, "Georgia, serif", "bold");
+        ctx.textAlign = "center";
+        ctx.fillText(String(station.id), x + 48, y + 58);
+
+        ctx.textAlign = "left";
+        ctx.fillStyle = "#28342f";
+        ctx.font = canvasFont(28, "Georgia, serif", "bold");
+        ctx.fillText(shortStationTitle(station), x + 95, y + 57);
+
+        drawFramedPhoto(ctx, stationImages[i], x + 28, y + 92, 285, 240);
+
+        ctx.fillStyle = "#4c4a42";
+        ctx.font = canvasFont(22, "Georgia, serif");
+        wrapCanvasText(ctx, ARCHIVE_NOTES[station.id], x + 345, y + 112, cardW - 375, 30, 7);
+
+        ctx.fillStyle = "#5f5b50";
+        ctx.font = canvasFont(18, "Georgia, serif", "bold");
+        ctx.fillText("FUND VOR ORT", x + 28, y + 372);
+        ctx.fillStyle = "#3f4843";
+        ctx.font = canvasFont(22, "Georgia, serif");
+        wrapCanvasText(ctx, station.taskSolution(normalizeRoute()), x + 28, y + 402, cardW - 56, 28, 2);
+        ctx.fillStyle = "#7b2833";
+        ctx.font = canvasFont(18, "Georgia, serif", "bold");
+        ctx.fillText("BEWEISSTÜCK FÜR DIE ABSCHLUSSAKTE", x + 28, y + 458);
+        ctx.fillStyle = "#173f35";
+        ctx.font = canvasFont(30, '"Brush Script MT", "Segoe Script", cursive', "bold", "italic");
+        wrapCanvasText(ctx, station.evidence.fragment, x + 28, y + 488, cardW - 56, 34, 1);
+        ctx.restore();
+      }
+
+      const bottomY = startY + 3 * (cardH + gapY) + 10;
+      ctx.fillStyle = "rgba(123,40,51,.10)";
+      roundRectPath(ctx, 82, bottomY, 1436, 180, 20);
+      ctx.fill();
+      ctx.strokeStyle = "rgba(123,40,51,.35)";
+      ctx.stroke();
+      ctx.textAlign = "left";
+      ctx.fillStyle = "#7b2833";
+      ctx.font = canvasFont(24, "Georgia, serif", "bold");
+      ctx.fillText("BEWEISE ZUSAMMENGESETZT", 110, bottomY + 42);
+      ctx.fillStyle = "#173f35";
+      ctx.font = canvasFont(30, "Georgia, serif", "bold");
+      wrapCanvasText(ctx, "11  +  JULI  +  1823  +  GEORG IV.  +  FLECKEN LEER  +  RECHTE EINER STADT", 110, bottomY + 92, 1350, 42, 2);
+
+      const finalY = bottomY + 220;
+      drawFramedPhoto(ctx, finalImage, 1045, finalY, 425, 275);
+      ctx.textAlign = "left";
+      ctx.fillStyle = "#173f35";
+      ctx.font = canvasFont(44, '"Brush Script MT", "Segoe Script", cursive', "normal", "italic");
+      ctx.fillText(crewName, 1060, finalY + 330);
+
+      ctx.fillStyle = "#7b2833";
+      ctx.font = canvasFont(38, "Georgia, serif", "bold");
+      ctx.fillText("6 Spuren verfolgt", 110, finalY + 55);
+      ctx.fillText("6 Beweise gesichert", 110, finalY + 110);
+      ctx.fillText("Fall gelöst!", 110, finalY + 165);
+      ctx.fillStyle = "#28342f";
+      ctx.font = canvasFont(27, "Georgia, serif", "bold");
+      wrapCanvasText(ctx, "Am 11. Juli 1823 verlieh König Georg IV. dem Flecken Leer die Rechte einer Stadt.", 110, finalY + 235, 820, 40, 3);
+
+      const blob = await canvasToBlob(canvas, "image/png");
+      showGeneratedMemory("Ermittlungskarte – Akte 1823", blob, `Akte-1823-Ermittlungskarte-${safeFileName(crewName)}.png`, "image");
+    } catch (error) {
+      console.error(error);
+      showToast("Die Ermittlungskarte konnte auf diesem Gerät nicht erstellt werden.", 4500);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  function safeFileName(value) {
+    return String(value || "Crew").normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-zA-Z0-9_-]+/g, "-").replace(/^-+|-+$/g, "") || "Crew";
+  }
+
+  function clearGeneratedUrls() {
+    if (state.memoryOutputUrl) URL.revokeObjectURL(state.memoryOutputUrl);
+    if (state.memoryVideoUrl) URL.revokeObjectURL(state.memoryVideoUrl);
+    state.memoryOutputUrl = "";
+    state.memoryVideoUrl = "";
+  }
+
+  function showGeneratedMemory(title, blob, filename, kind = "image") {
+    clearGeneratedUrls();
+    const panel = document.getElementById("generatedMemoryPanel");
+    const titleEl = document.getElementById("generatedMemoryTitle");
+    const image = document.getElementById("generatedMemoryImage");
+    const video = document.getElementById("generatedMemoryVideo");
+    const download = document.getElementById("downloadMemoryButton");
+    if (!panel || !download) return;
+
+    const url = URL.createObjectURL(blob);
+    if (kind === "video") state.memoryVideoUrl = url;
+    else state.memoryOutputUrl = url;
+    panel.dataset.blobType = blob.type || "application/octet-stream";
+    panel.dataset.filename = filename;
+    panel._generatedBlob = blob;
+    if (titleEl) titleEl.textContent = title;
+    download.href = url;
+    download.download = filename;
+
+    if (image) {
+      image.hidden = kind !== "image";
+      if (kind === "image") image.src = url;
+    }
+    if (video) {
+      video.hidden = kind !== "video";
+      if (kind === "video") {
+        video.src = url;
+        video.load();
+      }
+    }
+    panel.hidden = false;
+    panel.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+
+  async function shareGeneratedMemory() {
+    const panel = document.getElementById("generatedMemoryPanel");
+    const blob = panel?._generatedBlob;
+    const filename = panel?.dataset.filename || "Akte-1823-Erinnerung";
+    if (!blob) return;
+    const file = new File([blob], filename, { type: blob.type || "application/octet-stream" });
+    try {
+      if (navigator.share && navigator.canShare?.({ files: [file] })) {
+        await navigator.share({ files: [file], title: "Akte 1823", text: "Unsere Erinnerung an die Spurensuche durch Leer" });
+      } else {
+        document.getElementById("downloadMemoryButton")?.click();
+        showToast("Direktes Teilen wird hier nicht unterstützt. Die Datei wurde zum Speichern geöffnet.");
+      }
+    } catch (error) {
+      if (error?.name !== "AbortError") showToast("Teilen war nicht möglich. Bitte die Datei speichern und anschließend teilen.");
+    }
+  }
+
+  async function getSlideshowSlides() {
+    const slides = [];
+    for (const station of STATIONS) {
+      slides.push({
+        title: `Akte ${station.id} · ${station.title}`,
+        subtitle: station.evidence.fragment,
+        note: ARCHIVE_NOTES[station.id],
+        image: await blobToImage(await getMemoryPhoto("station", station.id))
+      });
+    }
+    slides.push({
+      title: "FALL GELÖST",
+      subtitle: normalizeSetup(state.game.setup).crewName || "Crew",
+      note: "Am 11. Juli 1823 verlieh König Georg IV. dem Flecken Leer die Rechte einer Stadt.",
+      image: await blobToImage(await getMemoryPhoto("final", "crew")),
+      final: true
+    });
+    return slides;
+  }
+
+  function drawSlideshowSlide(ctx, canvas, slide, progress = 1) {
+    drawParchment(ctx, canvas.width, canvas.height);
+    ctx.save();
+    ctx.globalAlpha = Math.max(0.05, Math.min(1, progress));
+    ctx.fillStyle = "#173f35";
+    ctx.fillRect(0, 0, canvas.width, 122);
+    ctx.fillStyle = "#f7f1e6";
+    ctx.textAlign = "center";
+    ctx.font = canvasFont(38, "Georgia, serif", "bold");
+    ctx.fillText("AKTE 1823 · LEER", canvas.width / 2, 75);
+
+    drawFramedPhoto(ctx, slide.image, 72, 205, 576, 650);
+    ctx.fillStyle = slide.final ? "#7b2833" : "#173f35";
+    ctx.font = canvasFont(slide.final ? 58 : 42, "Georgia, serif", "bold");
+    ctx.fillText(slide.title, canvas.width / 2, 950);
+    ctx.fillStyle = "#7b2833";
+    ctx.font = canvasFont(42, '"Brush Script MT", "Segoe Script", cursive', "bold", "italic");
+    wrapCanvasText(ctx, slide.subtitle, canvas.width / 2, 1010, 600, 48, 2);
+    ctx.fillStyle = "#37443e";
+    ctx.font = canvasFont(27, "Georgia, serif");
+    ctx.textAlign = "center";
+    wrapCenteredCanvasText(ctx, slide.note, canvas.width / 2, 1115, 600, 38, 4);
+    ctx.restore();
+  }
+
+  function wrapCenteredCanvasText(ctx, text, centerX, y, maxWidth, lineHeight, maxLines = 10) {
+    const words = String(text || "").split(/\s+/).filter(Boolean);
+    let line = "";
+    let lines = 0;
+    for (const word of words) {
+      const test = line ? `${line} ${word}` : word;
+      if (ctx.measureText(test).width > maxWidth && line) {
+        ctx.fillText(line, centerX, y + lines * lineHeight);
+        line = word;
+        lines += 1;
+        if (lines >= maxLines) return;
+      } else line = test;
+    }
+    if (line && lines < maxLines) ctx.fillText(line, centerX, y + lines * lineHeight);
+  }
+
+  async function openSlideshowPanel() {
+    const panel = document.getElementById("slideshowPanel");
+    if (panel) {
+      panel.hidden = false;
+      panel.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+    await playSlideshowPreview();
+  }
+
+  async function playSlideshowPreview() {
+    const canvas = document.getElementById("slideshowCanvas");
+    const status = document.getElementById("slideshowStatus");
+    if (!canvas) return;
+    if (state.slideshowTimer) {
+      clearTimeout(state.slideshowTimer);
+      state.slideshowTimer = null;
+    }
+    const ctx = canvas.getContext("2d");
+    const slides = await getSlideshowSlides();
+    let index = 0;
+    const showNext = () => {
+      drawSlideshowSlide(ctx, canvas, slides[index], 1);
+      if (status) status.textContent = `${index + 1} von ${slides.length} · ohne Musik`;
+      index += 1;
+      if (index < slides.length) state.slideshowTimer = setTimeout(showNext, index === slides.length - 1 ? 1700 : 1450);
+      else if (status) status.textContent = "Slideshow beendet. Ihr könnt sie erneut ansehen oder als Video erzeugen.";
+    };
+    showNext();
+  }
+
+  function preferredVideoMimeType() {
+    if (!window.MediaRecorder) return "";
+    const candidates = [
+      "video/mp4;codecs=avc1.42E01E",
+      "video/mp4",
+      "video/webm;codecs=vp9",
+      "video/webm;codecs=vp8",
+      "video/webm"
+    ];
+    return candidates.find((type) => MediaRecorder.isTypeSupported?.(type)) || "";
+  }
+
+  function wait(ms) {
+    return new Promise((resolve) => setTimeout(resolve, ms));
+  }
+
+  async function createMemoryVideo() {
+    const canvas = document.getElementById("slideshowCanvas");
+    const status = document.getElementById("slideshowStatus");
+    if (!canvas || !canvas.captureStream || !window.MediaRecorder) {
+      showToast("Dieser Browser kann die Slideshow anzeigen, aber kein Video daraus exportieren.", 5000);
+      return;
+    }
+    const mimeType = preferredVideoMimeType();
+    if (!mimeType) {
+      showToast("Auf diesem Gerät wird kein passendes Videoformat unterstützt.", 5000);
+      return;
+    }
+    setBusy(true);
+    try {
+      const slides = await getSlideshowSlides();
+      const ctx = canvas.getContext("2d");
+      const stream = canvas.captureStream(24);
+      const recorder = new MediaRecorder(stream, { mimeType, videoBitsPerSecond: 4_500_000 });
+      const chunks = [];
+      recorder.ondataavailable = (event) => { if (event.data?.size) chunks.push(event.data); };
+      const stopped = new Promise((resolve, reject) => {
+        recorder.onstop = resolve;
+        recorder.onerror = () => reject(recorder.error || new Error("Videoexport fehlgeschlagen."));
+      });
+      recorder.start(250);
+      for (let i = 0; i < slides.length; i += 1) {
+        drawSlideshowSlide(ctx, canvas, slides[i], 1);
+        if (status) status.textContent = `Video wird erstellt: ${i + 1} von ${slides.length}`;
+        await wait(slides[i].final ? 2300 : 1450);
+      }
+      recorder.stop();
+      await stopped;
+      stream.getTracks().forEach((track) => track.stop());
+      const blob = new Blob(chunks, { type: recorder.mimeType || mimeType });
+      const extension = blob.type.includes("mp4") ? "mp4" : "webm";
+      const crew = safeFileName(normalizeSetup(state.game.setup).crewName || "Crew");
+      showGeneratedMemory("Slideshow-Video – Akte 1823", blob, `Akte-1823-${crew}.${extension}`, "video");
+      if (status) status.textContent = "Video fertig. Es enthält absichtlich keine Musik.";
+    } catch (error) {
+      console.error(error);
+      showToast("Das Video konnte auf diesem Gerät nicht erstellt werden. Die Slideshow bleibt verfügbar.", 5000);
+    } finally {
+      setBusy(false);
     }
   }
 
