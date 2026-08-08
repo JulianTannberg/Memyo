@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const APP_VERSION = "3.1.1";
+  const APP_VERSION = "3.2.0";
   const STORAGE_KEY = "akte1823.game";
   const SNAPSHOT_KEY = "akte1823.game.snapshot";
   const RECENT_GAMES_KEY = "akte1823.recentGames";
@@ -206,11 +206,27 @@
     photoFile: null,
     photoUrl: "",
     photoStationId: null,
+    compassStationId: null,
+    compassWatchId: null,
+    compassHeading: null,
+    compassPosition: null,
+    compassOrientationHandler: null,
+    compassActive: false,
     connecting: false,
     lastConnectionError: null,
     memoryOutputUrl: "",
     memoryVideoUrl: "",
     slideshowTimer: null
+  };
+
+  const photoBoothState = {
+    stream: null,
+    facingMode: "environment",
+    kind: null,
+    stationId: null,
+    capturedBlob: null,
+    capturedUrl: "",
+    busy: false
   };
 
   const app = document.getElementById("app");
@@ -902,11 +918,13 @@
 
   async function goToStation(stationNumber) {
     const target = Math.max(0, Math.min(7, Number(stationNumber)));
+    stopCompass();
     clearPhotoState();
     await updateGame({ current_station: target }, target === 7 ? "Abschlussakte geöffnet." : "Nächste Station geöffnet.");
   }
 
   async function leaveGame() {
+    stopCompass();
     if (state.game) rememberRecentGame(state.game);
     if (state.channel && state.client) {
       await state.client.removeChannel(state.channel);
@@ -1072,20 +1090,14 @@
     }).join("");
 
     const crewName = normalizeSetup(state.game.setup).crewName || "Crew";
-    const codeMarkup = current === 0
-      ? `
-          <div class="game-code-start" aria-label="Spielcode für weitere Geräte">
-            <div class="game-code-main">
-              <div class="game-label">Spielcode für eure Crew</div>
-              <div class="game-code game-code-visible">${escapeHtml(state.game.code)}</div>
-              <div class="game-code-help">Jetzt teilen oder vorlesen. Sobald die Spurensuche startet, bleibt der Code nur noch über „Spielcode anzeigen“ aufrufbar.</div>
-            </div>
-            <div class="game-share-actions">
-              <button id="copyCodeButton" class="btn btn-secondary" type="button">Code kopieren</button>
-              <button id="shareLinkButton" class="btn btn-secondary" type="button">Link teilen</button>
-            </div>
-          </div>`
-      : `
+
+    return `
+      <section class="game-head">
+        <div class="game-head-top compact-game-head">
+          <div class="crew-summary">
+            <div class="game-label">Crew</div>
+            <div class="game-code crew-code">${escapeHtml(crewName)}</div>
+          </div>
           <details class="game-code-details">
             <summary>Spielcode anzeigen</summary>
             <div class="game-code-panel">
@@ -1099,16 +1111,7 @@
                 <button id="shareLinkButton" class="btn btn-secondary" type="button">Link teilen</button>
               </div>
             </div>
-          </details>`;
-
-    return `
-      <section class="game-head ${current === 0 ? "lobby-game-head" : ""}">
-        <div class="game-head-top compact-game-head">
-          <div class="crew-summary">
-            <div class="game-label">Crew</div>
-            <div class="game-code crew-code">${escapeHtml(crewName)}</div>
-          </div>
-          ${codeMarkup}
+          </details>
         </div>
         <div class="progress-wrap"><div class="progress-list">${steps}</div></div>
       </section>
@@ -1171,13 +1174,36 @@
     `;
   }
 
-  function renderNavigationHelp(targetStation, summaryText = "Navigation öffnen") {
+  function renderCompassHelp(targetStation, summaryText = "Kompass & Navigation öffnen") {
     return `
       <details class="location-details compact-help">
         <summary>${escapeHtml(summaryText)}</summary>
-        <p><strong>${escapeHtml(targetStation.location.name)}</strong><br>${escapeHtml(targetStation.location.address)}</p>
-        <a class="btn btn-secondary map-link" href="https://www.google.com/maps/dir/?api=1&destination=${targetStation.location.lat},${targetStation.location.lon}&travelmode=walking" target="_blank" rel="noopener noreferrer">Zu Fuß navigieren</a>
-        <p class="help">Die Navigation öffnet sich in eurer Karten-App bzw. im Browser.</p>
+        <p>Die Kompassnadel zeigt ungefähr in Richtung des gesuchten Ziels, ohne seinen Namen zu verraten.</p>
+        <button id="startCompassButton" class="btn btn-secondary" data-target-station="${targetStation.id}" type="button">Kompass-Hilfe starten</button>
+        <div id="compassPanel" class="compass-panel" hidden>
+          <p class="compass-warning"><strong>Nur zur Orientierung:</strong> GPS, Handysensoren, Gebäude und Metall können die Anzeige verfälschen. Achtet auf Straßenschilder und den Verkehr.</p>
+          <div class="compass-dial" aria-label="Kompassnadel zum Ziel">
+            <div class="compass-cardinal north">N</div>
+            <div class="compass-cardinal east">O</div>
+            <div class="compass-cardinal south">S</div>
+            <div class="compass-cardinal west">W</div>
+            <div id="compassNeedle" class="compass-needle" aria-hidden="true"><span>▲</span></div>
+            <div class="compass-center" aria-hidden="true"></div>
+          </div>
+          <p id="compassStatus" class="compass-status" aria-live="polite">Standort und Kompass werden vorbereitet …</p>
+          <div class="compass-values">
+            <div><strong id="compassDistance">–</strong><span>Entfernung</span></div>
+            <div><strong id="compassDirection">–</strong><span>Zielrichtung</span></div>
+            <div><strong id="compassAccuracy">–</strong><span>GPS-Genauigkeit</span></div>
+          </div>
+          <button id="stopCompassButton" class="btn btn-text" type="button">Kompass beenden</button>
+        </div>
+        <details class="emergency-address">
+          <summary>Adresse & Karten-Navigation</summary>
+          <p><strong>${escapeHtml(targetStation.location.name)}</strong><br>${escapeHtml(targetStation.location.address)}</p>
+          <a class="btn btn-secondary map-link" href="https://www.google.com/maps/dir/?api=1&destination=${targetStation.location.lat},${targetStation.location.lon}&travelmode=walking" target="_blank" rel="noopener noreferrer">Zu Fuß navigieren</a>
+        </details>
+        <p class="help">Der Standort bleibt auf diesem Handy und wird nicht in Supabase gespeichert.</p>
       </details>
     `;
   }
@@ -1207,7 +1233,7 @@
           <summary>Hinweis zum Rätsel</summary>
           <p>${escapeHtml(hint)}</p>
         </details>
-        ${renderNavigationHelp(targetStation)}
+        ${renderCompassHelp(targetStation)}
         <button id="reveal${isOpening ? "Arrival" : "Destination"}Button" class="btn btn-danger full-button" type="button">Ziel aufdecken und weiterspielen</button>
       </section>
     `;
@@ -1219,7 +1245,7 @@
         <summary>Fotoaufgabe</summary>
         <p>${escapeHtml(station.photo)}</p>
         <div class="photo-actions">
-          <button id="takePhotoButton" class="btn btn-primary" type="button">Kamera öffnen</button>
+          <button id="takePhotoButton" class="btn btn-primary" type="button">Stadtspiel-Fotobox öffnen</button>
           <button id="choosePhotoButton" class="btn btn-secondary" type="button">Bild auswählen</button>
         </div>
         <input id="cameraInput" type="file" accept="image/*" capture="environment" hidden>
@@ -1302,7 +1328,7 @@
                 <summary>Hinweis zur Aufgabe</summary>
                 <p>${escapeHtml(station.taskHint)}</p>
               </details>
-              ${renderNavigationHelp(station, "Navigation zum Fundort")}
+              ${renderCompassHelp(station, "Kompass & Navigation zum Fundort")}
               <button id="revealTaskButton" class="btn btn-danger full-button" type="button">Lösung aufdecken und weiterspielen</button>
             </section>
           ` : `
@@ -1362,7 +1388,7 @@
             <img id="finalCrewPhotoPreview" alt="Abschlussfoto der Crew" hidden>
           </div>
           <div class="photo-actions">
-            <button id="takeFinalPhotoButton" class="btn btn-primary" type="button">Abschlussfoto aufnehmen</button>
+            <button id="takeFinalPhotoButton" class="btn btn-primary" type="button">Crew-Fotobox öffnen</button>
             <button id="chooseFinalPhotoButton" class="btn btn-secondary" type="button">Aus Galerie wählen</button>
           </div>
           <input id="finalCrewCameraInput" type="file" accept="image/*" capture="environment" hidden>
@@ -1550,8 +1576,393 @@
     await updateGame({ answers, current_station: 7 }, revealed ? "Abschlussakte mit Notfallhilfe geöffnet." : "Abschlussakte vollständig gelöst.");
   }
 
+
+  function photoBoothMeta(kind, stationId) {
+    const crewName = normalizeSetup(state.game?.setup).crewName || "Crew";
+    if (kind === "final") {
+      return {
+        kicker: "AKTE 1823 · ABSCHLUSSFOTO",
+        title: "Fall gelöst!",
+        subtitle: `Crew ${crewName}`,
+        task: "Jetzt gehört die ganze Crew aufs Bild. Dieses Foto kommt auf eure Urkunde und in die Ermittlungskarte.",
+        footer: `Leer · ${dateLabel()}`,
+        stationLabel: "AKTE GESCHLOSSEN"
+      };
+    }
+    const station = STATIONS.find((item) => item.id === Number(stationId)) || STATIONS[0];
+    const titles = {
+      1: ["TEELKE", "Die Spur des Tees"],
+      2: ["GROSSE KIRCHE", "Das Schiff über den Dächern"],
+      3: ["HERMANN-TEMPEL-HAUS", "Vom Speicher zum Wissen"],
+      4: ["HAUS SAMSON", "Der starke Mann und der Löwe"],
+      5: ["HISTORISCHES RATHAUS", "Die Stadt im Wappen"],
+      6: ["ALTE WAAGE", "Das Finale am Wasser"]
+    };
+    const [title, subtitle] = titles[station.id] || [station.title.toUpperCase(), station.kicker];
+    return {
+      kicker: `AKTE ${String(station.id).padStart(2, "0")} · FOTOAUFGABE`,
+      title,
+      subtitle,
+      task: station.photo,
+      footer: "Leer · Akte 1823",
+      stationLabel: `AKTE ${String(station.id).padStart(2, "0")}`
+    };
+  }
+
+  function stopCityPhotoCamera() {
+    if (photoBoothState.stream) {
+      photoBoothState.stream.getTracks().forEach((track) => track.stop());
+    }
+    photoBoothState.stream = null;
+    const video = document.getElementById("cityPhotoBoothVideo");
+    if (video) video.srcObject = null;
+  }
+
+  function clearCityPhotoCapture() {
+    if (photoBoothState.capturedUrl) URL.revokeObjectURL(photoBoothState.capturedUrl);
+    photoBoothState.capturedBlob = null;
+    photoBoothState.capturedUrl = "";
+  }
+
+  function closeCityPhotoBooth() {
+    stopCityPhotoCamera();
+    clearCityPhotoCapture();
+    photoBoothState.busy = false;
+    document.getElementById("cityPhotoBooth")?.remove();
+    document.body.classList.remove("photo-booth-open");
+  }
+
+  function cityPhotoLiveOverlay(meta, kind) {
+    if (kind === "final") {
+      return `
+        <div class="city-photo-live-overlay final-overlay">
+          <div class="photo-overlay-small">AKTE 1823</div>
+          <div class="photo-overlay-final-title">FALL GELÖST</div>
+          <div class="photo-overlay-script">${escapeHtml(meta.subtitle)}</div>
+          <div class="photo-overlay-footer">${escapeHtml(meta.footer)}</div>
+          <div class="photo-overlay-stamp">AKTE<br>GESCHLOSSEN</div>
+        </div>`;
+    }
+    return `
+      <div class="city-photo-live-overlay">
+        <div class="photo-overlay-small">${escapeHtml(meta.stationLabel)} · ${escapeHtml(meta.footer)}</div>
+        <div class="photo-overlay-title">${escapeHtml(meta.title)}</div>
+        <div class="photo-overlay-subtitle">${escapeHtml(meta.subtitle)}</div>
+      </div>`;
+  }
+
+  function openCityPhotoBooth(kind, stationId) {
+    closeCityPhotoBooth();
+    photoBoothState.kind = kind;
+    photoBoothState.stationId = stationId;
+    photoBoothState.facingMode = kind === "final" ? "user" : "environment";
+    const meta = photoBoothMeta(kind, stationId);
+    const modal = document.createElement("div");
+    modal.id = "cityPhotoBooth";
+    modal.className = "city-photo-booth";
+    modal.innerHTML = `
+      <div class="city-photo-booth-shell">
+        <button id="closeCityPhotoBooth" class="city-photo-close" type="button" aria-label="Fotobox schließen">×</button>
+
+        <section id="cityPhotoPrompt" class="city-photo-prompt">
+          <div class="city-photo-prompt-mark">⌕</div>
+          <p class="city-photo-kicker">${escapeHtml(meta.kicker)}</p>
+          <h2>${escapeHtml(kind === "final" ? meta.title : `Fotoakte ${String(stationId).padStart(2, "0")}`)}</h2>
+          <p class="city-photo-task">${escapeHtml(meta.task)}</p>
+          <div class="city-photo-prompt-preview">
+            <strong>${escapeHtml(meta.title)}</strong>
+            <span>${escapeHtml(meta.subtitle)}</span>
+          </div>
+          <p class="city-photo-orientation">Für Urkunde und Ermittlungskarte sieht das Foto <strong>im Querformat</strong> am besten aus.</p>
+          <button id="startCityPhotoCamera" class="btn btn-primary city-photo-main-button" type="button">Fotobox starten</button>
+          <button id="fallbackCityPhotoCamera" class="btn btn-text" type="button">Stattdessen normale Handykamera verwenden</button>
+        </section>
+
+        <section id="cityPhotoCameraStage" class="city-photo-camera-stage" hidden>
+          <div class="city-photo-viewfinder">
+            <video id="cityPhotoBoothVideo" autoplay muted playsinline></video>
+            ${cityPhotoLiveOverlay(meta, kind)}
+            <div id="cityPhotoCountdown" class="city-photo-countdown" aria-live="assertive"></div>
+          </div>
+          <div class="city-photo-camera-controls">
+            <button id="switchCityPhotoCamera" class="city-photo-round-button" type="button" aria-label="Kamera wechseln">↺</button>
+            <button id="shootCityPhoto" class="city-photo-shutter" type="button" aria-label="Foto aufnehmen"><span></span></button>
+            <button id="cancelCityPhotoCamera" class="city-photo-round-button" type="button" aria-label="Abbrechen">×</button>
+          </div>
+          <p class="city-photo-camera-help">3 · 2 · 1 – das passende Akten-Overlay wird automatisch ins Foto gesetzt.</p>
+        </section>
+
+        <section id="cityPhotoPreviewStage" class="city-photo-preview-stage" hidden>
+          <p class="city-photo-kicker">BEWEISFOTO</p>
+          <h2>So bleibt es in eurer Akte</h2>
+          <div class="city-photo-result-frame"><img id="cityPhotoResult" alt="Vorschau des Beweisfotos"></div>
+          <div class="city-photo-preview-actions">
+            <button id="retakeCityPhoto" class="btn btn-secondary" type="button">Nochmal</button>
+            <button id="useCityPhoto" class="btn btn-primary" type="button">Foto verwenden</button>
+          </div>
+        </section>
+      </div>`;
+    document.body.appendChild(modal);
+    document.body.classList.add("photo-booth-open");
+
+    modal.querySelector("#closeCityPhotoBooth")?.addEventListener("click", closeCityPhotoBooth);
+    modal.querySelector("#cancelCityPhotoCamera")?.addEventListener("click", closeCityPhotoBooth);
+    modal.querySelector("#startCityPhotoCamera")?.addEventListener("click", startCityPhotoCamera);
+    modal.querySelector("#switchCityPhotoCamera")?.addEventListener("click", switchCityPhotoCamera);
+    modal.querySelector("#shootCityPhoto")?.addEventListener("click", runCityPhotoCountdown);
+    modal.querySelector("#retakeCityPhoto")?.addEventListener("click", retakeCityPhoto);
+    modal.querySelector("#useCityPhoto")?.addEventListener("click", useCityPhotoCapture);
+    modal.querySelector("#fallbackCityPhotoCamera")?.addEventListener("click", () => {
+      const inputId = kind === "final" ? "finalCrewCameraInput" : "cameraInput";
+      closeCityPhotoBooth();
+      document.getElementById(inputId)?.click();
+    });
+  }
+
+  async function startCityPhotoCamera() {
+    if (photoBoothState.busy) return;
+    if (!navigator.mediaDevices?.getUserMedia) {
+      showToast("Die integrierte Fotobox wird von diesem Browser nicht unterstützt. Nutzt bitte die normale Handykamera.", 4500);
+      return;
+    }
+    photoBoothState.busy = true;
+    stopCityPhotoCamera();
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: false,
+        video: {
+          facingMode: { ideal: photoBoothState.facingMode },
+          width: { ideal: 1920 },
+          height: { ideal: 1080 }
+        }
+      });
+      photoBoothState.stream = stream;
+      const prompt = document.getElementById("cityPhotoPrompt");
+      const cameraStage = document.getElementById("cityPhotoCameraStage");
+      const previewStage = document.getElementById("cityPhotoPreviewStage");
+      if (prompt) prompt.hidden = true;
+      if (previewStage) previewStage.hidden = true;
+      if (cameraStage) cameraStage.hidden = false;
+      const video = document.getElementById("cityPhotoBoothVideo");
+      if (!video) throw new Error("Kameravorschau fehlt.");
+      video.srcObject = stream;
+      video.classList.toggle("front-camera", photoBoothState.facingMode === "user");
+      await video.play();
+    } catch (error) {
+      console.warn("Stadtspiel-Fotobox Kamera:", error);
+      const prompt = document.getElementById("cityPhotoPrompt");
+      const cameraStage = document.getElementById("cityPhotoCameraStage");
+      if (prompt) prompt.hidden = false;
+      if (cameraStage) cameraStage.hidden = true;
+      showToast("Kamera konnte nicht geöffnet werden. Ihr könnt unten die normale Handykamera verwenden.", 4800);
+    } finally {
+      photoBoothState.busy = false;
+    }
+  }
+
+  async function switchCityPhotoCamera() {
+    if (photoBoothState.busy) return;
+    photoBoothState.facingMode = photoBoothState.facingMode === "user" ? "environment" : "user";
+    await startCityPhotoCamera();
+  }
+
+  function delay(ms) {
+    return new Promise((resolve) => setTimeout(resolve, ms));
+  }
+
+  async function runCityPhotoCountdown() {
+    if (photoBoothState.busy || !photoBoothState.stream) return;
+    photoBoothState.busy = true;
+    const shutter = document.getElementById("shootCityPhoto");
+    const switcher = document.getElementById("switchCityPhotoCamera");
+    if (shutter) shutter.disabled = true;
+    if (switcher) switcher.disabled = true;
+    const countdown = document.getElementById("cityPhotoCountdown");
+    try {
+      for (const number of [3, 2, 1]) {
+        if (countdown) countdown.textContent = String(number);
+        await delay(700);
+      }
+      if (countdown) {
+        countdown.textContent = "Bitte lächeln!";
+        countdown.classList.add("smile");
+      }
+      await delay(350);
+      await captureCityPhoto();
+    } finally {
+      if (countdown) {
+        countdown.textContent = "";
+        countdown.classList.remove("smile");
+      }
+      photoBoothState.busy = false;
+    }
+  }
+
+  function drawPhotoOverlay(ctx, width, height, kind, stationId) {
+    const meta = photoBoothMeta(kind, stationId);
+    const scale = Math.max(0.7, Math.min(2.2, Math.min(width, height) / 900));
+    const bandHeight = kind === "final" ? Math.max(190 * scale, height * 0.24) : Math.max(145 * scale, height * 0.18);
+    const y = height - bandHeight;
+    const pad = Math.max(30 * scale, width * 0.032);
+    ctx.save();
+    ctx.fillStyle = "rgba(16, 54, 45, .92)";
+    ctx.fillRect(0, y, width, bandHeight);
+    ctx.fillStyle = "#b08a45";
+    ctx.fillRect(0, y, width, Math.max(7 * scale, 5));
+    ctx.textBaseline = "alphabetic";
+
+    if (kind === "final") {
+      ctx.fillStyle = "#f5ead6";
+      ctx.font = `700 ${Math.max(30 * scale, width * 0.036)}px Georgia, serif`;
+      ctx.fillText("AKTE 1823 · FALL GELÖST", pad, y + bandHeight * 0.34);
+      ctx.fillStyle = "#f5ead6";
+      ctx.font = `italic ${Math.max(39 * scale, width * 0.048)}px \"Segoe Script\", \"Brush Script MT\", cursive`;
+      ctx.fillText(meta.subtitle, pad, y + bandHeight * 0.66);
+      ctx.font = `600 ${Math.max(19 * scale, width * 0.022)}px Georgia, serif`;
+      ctx.fillStyle = "#d9c8a9";
+      ctx.fillText(meta.footer, pad, y + bandHeight * 0.88);
+
+      const stampW = Math.min(width * 0.27, 260 * scale);
+      const stampH = bandHeight * 0.60;
+      const sx = width - pad - stampW;
+      const sy = y + bandHeight * 0.20;
+      ctx.translate(sx + stampW / 2, sy + stampH / 2);
+      ctx.rotate(-0.08);
+      ctx.strokeStyle = "#a94c45";
+      ctx.lineWidth = Math.max(5, 5 * scale);
+      ctx.strokeRect(-stampW / 2, -stampH / 2, stampW, stampH);
+      ctx.fillStyle = "#c8675d";
+      ctx.textAlign = "center";
+      ctx.font = `800 ${Math.max(20 * scale, width * 0.023)}px Georgia, serif`;
+      ctx.fillText("AKTE", 0, -5 * scale);
+      ctx.fillText("GESCHLOSSEN", 0, 28 * scale);
+    } else {
+      ctx.fillStyle = "#d9c8a9";
+      ctx.font = `700 ${Math.max(18 * scale, width * 0.020)}px Georgia, serif`;
+      ctx.fillText(`${meta.stationLabel} · ${meta.footer}`, pad, y + bandHeight * 0.29);
+      ctx.fillStyle = "#f5ead6";
+      ctx.font = `700 ${Math.max(31 * scale, width * 0.037)}px Georgia, serif`;
+      ctx.fillText(meta.title, pad, y + bandHeight * 0.61);
+      ctx.font = `italic ${Math.max(22 * scale, width * 0.025)}px Georgia, serif`;
+      ctx.fillStyle = "#f0dfc5";
+      ctx.fillText(meta.subtitle, pad, y + bandHeight * 0.84);
+    }
+    ctx.restore();
+  }
+
+  function drawPhotoSource(ctx, source, width, height, mirror = false) {
+    const sw = source.videoWidth || source.naturalWidth || source.width;
+    const sh = source.videoHeight || source.naturalHeight || source.height;
+    if (!sw || !sh) throw new Error("Bildgröße konnte nicht bestimmt werden.");
+    const targetRatio = width / height;
+    const sourceRatio = sw / sh;
+    let sx = 0, sy = 0, cropW = sw, cropH = sh;
+    if (sourceRatio > targetRatio) {
+      cropW = sh * targetRatio;
+      sx = (sw - cropW) / 2;
+    } else if (sourceRatio < targetRatio) {
+      cropH = sw / targetRatio;
+      sy = (sh - cropH) / 2;
+    }
+    ctx.save();
+    if (mirror) {
+      ctx.translate(width, 0);
+      ctx.scale(-1, 1);
+    }
+    ctx.drawImage(source, sx, sy, cropW, cropH, 0, 0, width, height);
+    ctx.restore();
+  }
+
+  async function captureCityPhoto() {
+    const video = document.getElementById("cityPhotoBoothVideo");
+    if (!video || !video.videoWidth || !video.videoHeight) throw new Error("Kamerabild ist noch nicht bereit.");
+    const canvas = document.createElement("canvas");
+    // Einheitliches 4:3-Querformat: ideal für Urkunde, Ermittlungskarte und Slideshow.
+    const maxWidth = Math.min(1800, Math.max(1200, video.videoWidth));
+    canvas.width = maxWidth;
+    canvas.height = Math.round(maxWidth * 3 / 4);
+    const ctx = canvas.getContext("2d");
+    drawPhotoSource(ctx, video, canvas.width, canvas.height, photoBoothState.facingMode === "user");
+    drawPhotoOverlay(ctx, canvas.width, canvas.height, photoBoothState.kind, photoBoothState.stationId);
+    const blob = await canvasToBlob(canvas, "image/jpeg", 0.92);
+    stopCityPhotoCamera();
+    clearCityPhotoCapture();
+    photoBoothState.capturedBlob = blob;
+    photoBoothState.capturedUrl = URL.createObjectURL(blob);
+    const cameraStage = document.getElementById("cityPhotoCameraStage");
+    const previewStage = document.getElementById("cityPhotoPreviewStage");
+    const result = document.getElementById("cityPhotoResult");
+    if (cameraStage) cameraStage.hidden = true;
+    if (previewStage) previewStage.hidden = false;
+    if (result) result.src = photoBoothState.capturedUrl;
+  }
+
+  async function retakeCityPhoto() {
+    clearCityPhotoCapture();
+    const previewStage = document.getElementById("cityPhotoPreviewStage");
+    if (previewStage) previewStage.hidden = true;
+    await startCityPhotoCamera();
+  }
+
+  async function useCityPhotoCapture() {
+    const blob = photoBoothState.capturedBlob;
+    if (!blob || photoBoothState.busy) return;
+    photoBoothState.busy = true;
+    const kind = photoBoothState.kind;
+    const stationId = photoBoothState.stationId;
+    try {
+      if (kind === "final") {
+        await saveMemoryPhoto("final", "crew", blob);
+        closeCityPhotoBooth();
+        await refreshMemoryPhotoStatus();
+        showToast("Abschlussfoto mit Akte-1823-Overlay gespeichert.", 3200);
+      } else {
+        await saveMemoryPhoto("station", Number(stationId), blob);
+        clearPhotoState();
+        const file = new File([blob], `akte-1823-station-${stationId}.jpg`, { type: "image/jpeg" });
+        state.photoFile = file;
+        state.photoUrl = URL.createObjectURL(file);
+        state.photoStationId = Number(stationId);
+        closeCityPhotoBooth();
+        showPhotoPreview();
+        showToast("Beweisfoto mit passendem Akten-Overlay gespeichert.", 3200);
+      }
+    } catch (error) {
+      console.error(error);
+      photoBoothState.busy = false;
+      showToast("Das Foto konnte auf diesem Gerät nicht gespeichert werden.", 4500);
+    }
+  }
+
+  async function imageBlobToDrawable(blob) {
+    if (window.createImageBitmap) {
+      try { return await createImageBitmap(blob); } catch { /* Fallback unten */ }
+    }
+    return blobToImage(blob);
+  }
+
+  async function addAktenOverlayToSelectedPhoto(blob, kind, stationId) {
+    const drawable = await imageBlobToDrawable(blob);
+    try {
+      const sw = drawable.width || drawable.naturalWidth;
+      const sh = drawable.height || drawable.naturalHeight;
+      if (!sw || !sh) return blob;
+      const canvas = document.createElement("canvas");
+      // Galerie-/Handykamerabilder werden ebenfalls als 4:3-Beweisfoto vereinheitlicht.
+      const width = Math.min(1800, Math.max(1200, sw));
+      canvas.width = width;
+      canvas.height = Math.round(width * 3 / 4);
+      const ctx = canvas.getContext("2d");
+      drawPhotoSource(ctx, drawable, canvas.width, canvas.height, false);
+      drawPhotoOverlay(ctx, canvas.width, canvas.height, kind, stationId);
+      return await canvasToBlob(canvas, "image/jpeg", 0.92);
+    } finally {
+      if (drawable && typeof drawable.close === "function") drawable.close();
+    }
+  }
+
   function bindPhotoEvents(stationId) {
-    document.getElementById("takePhotoButton")?.addEventListener("click", () => document.getElementById("cameraInput")?.click());
+    document.getElementById("takePhotoButton")?.addEventListener("click", () => openCityPhotoBooth("station", stationId));
     document.getElementById("choosePhotoButton")?.addEventListener("click", () => document.getElementById("galleryInput")?.click());
     document.getElementById("cameraInput")?.addEventListener("change", (event) => handlePhotoSelected(event, stationId));
     document.getElementById("galleryInput")?.addEventListener("change", (event) => handlePhotoSelected(event, stationId));
@@ -1560,10 +1971,16 @@
     else loadStoredStationPhoto(stationId);
   }
 
+  function bindCompassEvents() {
+    const button = document.getElementById("startCompassButton");
+    button?.addEventListener("click", () => startCompass(Number(button.dataset.targetStation)));
+    document.getElementById("stopCompassButton")?.addEventListener("click", stopCompass);
+  }
 
   function bindStationEvents(stationId) {
     const station = STATIONS[stationId - 1];
     const progress = getStationProgress(stationId);
+    bindCompassEvents();
 
     if (stationId === 1 && !progress.arrivalSolved) {
       document.getElementById("checkArrivalButton")?.addEventListener("click", () => checkArrival(station));
@@ -1610,7 +2027,7 @@
     });
     document.getElementById("finalHomeButton")?.addEventListener("click", returnHomeKeepingGame);
 
-    document.getElementById("takeFinalPhotoButton")?.addEventListener("click", () => document.getElementById("finalCrewCameraInput")?.click());
+    document.getElementById("takeFinalPhotoButton")?.addEventListener("click", () => openCityPhotoBooth("final", "crew"));
     document.getElementById("chooseFinalPhotoButton")?.addEventListener("click", () => document.getElementById("finalCrewGalleryInput")?.click());
     document.getElementById("finalCrewCameraInput")?.addEventListener("change", handleFinalCrewPhotoSelected);
     document.getElementById("finalCrewGalleryInput")?.addEventListener("change", handleFinalCrewPhotoSelected);
@@ -1632,6 +2049,166 @@
     refreshMemoryPhotoStatus();
   }
 
+  function normalizeDegrees(value) {
+    return ((Number(value) % 360) + 360) % 360;
+  }
+
+  function toRadians(value) {
+    return Number(value) * Math.PI / 180;
+  }
+
+  function calculateBearing(fromLat, fromLon, toLat, toLon) {
+    const lat1 = toRadians(fromLat);
+    const lat2 = toRadians(toLat);
+    const deltaLon = toRadians(toLon - fromLon);
+    const y = Math.sin(deltaLon) * Math.cos(lat2);
+    const x = Math.cos(lat1) * Math.sin(lat2) - Math.sin(lat1) * Math.cos(lat2) * Math.cos(deltaLon);
+    return normalizeDegrees(Math.atan2(y, x) * 180 / Math.PI);
+  }
+
+  function calculateDistance(fromLat, fromLon, toLat, toLon) {
+    const earthRadius = 6371000;
+    const deltaLat = toRadians(toLat - fromLat);
+    const deltaLon = toRadians(toLon - fromLon);
+    const lat1 = toRadians(fromLat);
+    const lat2 = toRadians(toLat);
+    const a = Math.sin(deltaLat / 2) ** 2 + Math.cos(lat1) * Math.cos(lat2) * Math.sin(deltaLon / 2) ** 2;
+    return earthRadius * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  }
+
+  function formatDistance(metres) {
+    if (!Number.isFinite(metres)) return "–";
+    if (metres < 1000) return `${Math.max(0, Math.round(metres / 5) * 5)} m`;
+    return `${(metres / 1000).toFixed(1).replace(".", ",")} km`;
+  }
+
+  function compassDirection(degrees) {
+    const directions = ["N", "NO", "O", "SO", "S", "SW", "W", "NW"];
+    return directions[Math.round(normalizeDegrees(degrees) / 45) % 8];
+  }
+
+  function readDeviceHeading(event) {
+    if (typeof event.webkitCompassHeading === "number") {
+      return normalizeDegrees(event.webkitCompassHeading);
+    }
+    if (typeof event.alpha !== "number") return null;
+    const screenAngle = Number(screen.orientation?.angle ?? window.orientation ?? 0);
+    return normalizeDegrees(360 - event.alpha + screenAngle);
+  }
+
+  function updateCompassDisplay() {
+    const station = STATIONS.find((item) => item.id === state.compassStationId);
+    const needle = document.getElementById("compassNeedle");
+    const distanceElement = document.getElementById("compassDistance");
+    const directionElement = document.getElementById("compassDirection");
+    const accuracyElement = document.getElementById("compassAccuracy");
+    const statusElement = document.getElementById("compassStatus");
+    if (!station || !needle || !distanceElement || !directionElement || !accuracyElement || !statusElement) return;
+
+    if (!state.compassPosition) {
+      statusElement.textContent = "Warte auf den aktuellen Standort …";
+      return;
+    }
+
+    const { latitude, longitude, accuracy } = state.compassPosition.coords;
+    const targetBearing = calculateBearing(latitude, longitude, station.location.lat, station.location.lon);
+    const distance = calculateDistance(latitude, longitude, station.location.lat, station.location.lon);
+    const relativeBearing = state.compassHeading === null
+      ? targetBearing
+      : normalizeDegrees(targetBearing - state.compassHeading);
+
+    needle.style.transform = `translate(-50%, -88%) rotate(${relativeBearing}deg)`;
+    distanceElement.textContent = formatDistance(distance);
+    directionElement.textContent = `${compassDirection(targetBearing)} · ${Math.round(targetBearing)}°`;
+    accuracyElement.textContent = Number.isFinite(accuracy) ? `± ${Math.round(accuracy)} m` : "–";
+
+    if (distance <= Math.max(20, accuracy || 0)) {
+      statusElement.textContent = "Ihr seid sehr nah am Ziel. Schaut euch jetzt in der Umgebung um.";
+    } else if (state.compassHeading === null) {
+      statusElement.textContent = "Standort gefunden. Der Richtungssensor liefert noch keine Werte. Bewegt das Handy kurz in Form einer Acht und haltet es möglichst waagerecht.";
+    } else {
+      statusElement.textContent = "Die rote Spitze zeigt ungefähr zum Ziel. Haltet das Handy möglichst waagerecht.";
+    }
+  }
+
+  async function requestCompassPermission() {
+    if (typeof DeviceOrientationEvent !== "undefined" && typeof DeviceOrientationEvent.requestPermission === "function") {
+      const result = await DeviceOrientationEvent.requestPermission();
+      if (result !== "granted") throw new Error("Kompassfreigabe wurde nicht erteilt.");
+    }
+  }
+
+  async function startCompass(stationId) {
+    const station = STATIONS.find((item) => item.id === stationId);
+    const panel = document.getElementById("compassPanel");
+    const button = document.getElementById("startCompassButton");
+    const status = document.getElementById("compassStatus");
+    if (!station || !panel || !status) return;
+
+    stopCompass(false);
+    state.compassStationId = stationId;
+    state.compassActive = true;
+    panel.hidden = false;
+    if (button) button.textContent = "Kompass neu starten";
+    status.textContent = "Standort und Kompass werden vorbereitet …";
+
+    try {
+      await requestCompassPermission();
+    } catch (error) {
+      state.compassHeading = null;
+      status.textContent = "Die Kompassfreigabe fehlt. Die App kann trotzdem Entfernung und Himmelsrichtung anzeigen.";
+    }
+
+    if (typeof DeviceOrientationEvent !== "undefined") {
+      state.compassOrientationHandler = (event) => {
+        const heading = readDeviceHeading(event);
+        if (heading === null) return;
+        state.compassHeading = heading;
+        updateCompassDisplay();
+      };
+      window.addEventListener("deviceorientationabsolute", state.compassOrientationHandler, true);
+      window.addEventListener("deviceorientation", state.compassOrientationHandler, true);
+    }
+
+    if (!navigator.geolocation) {
+      status.textContent = "Dieses Gerät stellt keinen Standort bereit. Nutzt bitte die Karten-App als Notlösung.";
+      return;
+    }
+
+    state.compassWatchId = navigator.geolocation.watchPosition(
+      (position) => {
+        state.compassPosition = position;
+        updateCompassDisplay();
+      },
+      (error) => {
+        const messages = {
+          1: "Der Standort wurde nicht freigegeben. Erlaubt den Standort in den Browser-Einstellungen oder nutzt die Karten-App.",
+          2: "Der Standort konnte gerade nicht bestimmt werden. Geht möglichst nach draußen und versucht es erneut.",
+          3: "Die Standortbestimmung dauert zu lange. Versucht es erneut oder nutzt die Karten-App."
+        };
+        status.textContent = messages[error.code] || "Der Standort konnte nicht bestimmt werden.";
+      },
+      { enableHighAccuracy: true, maximumAge: 3000, timeout: 15000 }
+    );
+  }
+
+  function stopCompass(hidePanel = true) {
+    if (state.compassWatchId !== null && navigator.geolocation) {
+      navigator.geolocation.clearWatch(state.compassWatchId);
+    }
+    if (state.compassOrientationHandler) {
+      window.removeEventListener("deviceorientationabsolute", state.compassOrientationHandler, true);
+      window.removeEventListener("deviceorientation", state.compassOrientationHandler, true);
+    }
+    state.compassWatchId = null;
+    state.compassOrientationHandler = null;
+    state.compassHeading = null;
+    state.compassPosition = null;
+    state.compassActive = false;
+    if (hidePanel) {
+      document.getElementById("compassPanel")?.setAttribute("hidden", "");
+    }
+  }
 
   function clearPhotoState() {
     if (state.photoUrl) URL.revokeObjectURL(state.photoUrl);
@@ -1641,9 +2218,16 @@
   }
 
   async function handlePhotoSelected(event, stationId) {
-    const file = event.target.files?.[0];
-    if (!file) return;
+    const originalFile = event.target.files?.[0];
+    if (!originalFile) return;
     clearPhotoState();
+    let blob = originalFile;
+    try {
+      blob = await addAktenOverlayToSelectedPhoto(originalFile, "station", stationId);
+    } catch (error) {
+      console.warn("Overlay konnte nicht gesetzt werden, Originalfoto wird verwendet:", error);
+    }
+    const file = new File([blob], `akte-1823-station-${stationId}.jpg`, { type: blob.type || "image/jpeg" });
     state.photoFile = file;
     state.photoUrl = URL.createObjectURL(file);
     state.photoStationId = stationId;
@@ -1655,6 +2239,7 @@
       showToast("Foto ist geöffnet, konnte aber nicht dauerhaft im Browser gespeichert werden.", 4200);
     }
     showPhotoPreview();
+    event.target.value = "";
   }
 
   function showPhotoPreview() {
@@ -1764,13 +2349,16 @@
     const file = event.target.files?.[0];
     if (!file) return;
     try {
-      await saveMemoryPhoto("final", "crew", file);
+      let blob = file;
+      try { blob = await addAktenOverlayToSelectedPhoto(file, "final", "crew"); } catch (error) { console.warn(error); }
+      await saveMemoryPhoto("final", "crew", blob);
       await refreshMemoryPhotoStatus();
       showToast("Abschlussfoto gespeichert.");
     } catch (error) {
       console.error(error);
       showToast("Das Abschlussfoto konnte auf diesem Gerät nicht gespeichert werden.", 4200);
     }
+    event.target.value = "";
   }
 
   async function handleMemoryStationPhotoSelected(event) {
@@ -1778,13 +2366,16 @@
     const stationId = Number(event.currentTarget?.dataset.memoryStation);
     if (!file || !stationId) return;
     try {
-      await saveMemoryPhoto("station", stationId, file);
+      let blob = file;
+      try { blob = await addAktenOverlayToSelectedPhoto(file, "station", stationId); } catch (error) { console.warn(error); }
+      await saveMemoryPhoto("station", stationId, blob);
       await refreshMemoryPhotoStatus();
       showToast(`Foto für Akte ${stationId} gespeichert.`);
     } catch (error) {
       console.error(error);
       showToast("Das Foto konnte auf diesem Gerät nicht gespeichert werden.", 4200);
     }
+    event.target.value = "";
   }
 
   async function refreshMemoryPhotoStatus() {
@@ -1948,60 +2539,6 @@
     });
   }
 
-  function drawWaxSeal(ctx, centerX, centerY, radius = 104) {
-    ctx.save();
-    ctx.translate(centerX, centerY);
-
-    // leicht unregelmäßiger Rand wie echtes Siegellack
-    const points = 48;
-    const edge = [];
-    for (let i = 0; i < points; i += 1) {
-      const angle = (Math.PI * 2 * i) / points;
-      const wobble = i % 2 === 0 ? 7 : -3;
-      edge.push({ x: Math.cos(angle) * (radius + wobble), y: Math.sin(angle) * (radius + wobble) });
-    }
-    ctx.beginPath();
-    edge.forEach((point, index) => index === 0 ? ctx.moveTo(point.x, point.y) : ctx.lineTo(point.x, point.y));
-    ctx.closePath();
-    const wax = ctx.createRadialGradient(-34, -42, 15, 0, 0, radius + 14);
-    wax.addColorStop(0, "#a83b49");
-    wax.addColorStop(0.46, "#7b2833");
-    wax.addColorStop(1, "#4f141d");
-    ctx.fillStyle = wax;
-    ctx.shadowColor = "rgba(45,18,20,.34)";
-    ctx.shadowBlur = 18;
-    ctx.shadowOffsetY = 10;
-    ctx.fill();
-    ctx.shadowColor = "transparent";
-
-    ctx.strokeStyle = "#53141d";
-    ctx.lineWidth = 7;
-    ctx.stroke();
-    ctx.strokeStyle = "#d2aa62";
-    ctx.lineWidth = 3;
-    ctx.beginPath();
-    ctx.arc(0, 0, radius - 21, 0, Math.PI * 2);
-    ctx.stroke();
-    ctx.beginPath();
-    ctx.arc(0, 0, radius - 34, 0, Math.PI * 2);
-    ctx.strokeStyle = "rgba(242,223,181,.55)";
-    ctx.lineWidth = 1.5;
-    ctx.stroke();
-
-    ctx.textAlign = "center";
-    ctx.fillStyle = "#f2dfb5";
-    ctx.font = canvasFont(24, "Georgia, serif", "bold");
-    ctx.fillText("AKTE 1823", 0, -54);
-    ctx.font = canvasFont(25, "Georgia, serif", "bold");
-    ctx.fillText("✦", 0, -24);
-    ctx.font = canvasFont(31, "Georgia, serif", "bold");
-    ctx.fillText("FALL", 0, 8);
-    ctx.fillText("GELÖST", 0, 43);
-    ctx.font = canvasFont(20, "Georgia, serif", "bold");
-    ctx.fillText("ARCHIV LEER", 0, 73);
-    ctx.restore();
-  }
-
   async function createCertificateMemory() {
     const finalBlob = await getMemoryPhoto("final", "crew");
     if (!finalBlob) {
@@ -2061,7 +2598,26 @@
       ctx.font = canvasFont(31, '"Brush Script MT", "Segoe Script", cursive', "normal", "italic");
       ctx.fillText(dateLabel(), 165, 1543);
 
-      drawWaxSeal(ctx, 620, 1515, 104);
+      ctx.save();
+      ctx.translate(620, 1515);
+      ctx.fillStyle = "#7b2833";
+      ctx.strokeStyle = "#5b1721";
+      ctx.lineWidth = 8;
+      ctx.beginPath();
+      ctx.arc(0, 0, 100, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+      ctx.strokeStyle = "#d2aa62";
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.arc(0, 0, 80, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.fillStyle = "#f2dfb5";
+      ctx.textAlign = "center";
+      ctx.font = canvasFont(27, "Georgia, serif", "bold");
+      ctx.fillText("AKTE", 0, -10);
+      ctx.fillText("GESCHLOSSEN", 0, 30);
+      ctx.restore();
 
       ctx.textAlign = "right";
       ctx.fillStyle = "rgba(76,67,54,.62)";
@@ -2100,7 +2656,7 @@
 
       const canvas = document.createElement("canvas");
       canvas.width = 1600;
-      canvas.height = 2600;
+      canvas.height = 2200;
       const ctx = canvas.getContext("2d");
       drawParchment(ctx, canvas.width, canvas.height);
       drawDecorativeBorder(ctx, canvas.width, canvas.height, 24);
@@ -2185,7 +2741,6 @@
       roundRectPath(ctx, 82, bottomY, 1436, 180, 20);
       ctx.fill();
       ctx.strokeStyle = "rgba(123,40,51,.35)";
-      ctx.lineWidth = 2;
       ctx.stroke();
       ctx.textAlign = "left";
       ctx.fillStyle = "#7b2833";
@@ -2195,30 +2750,21 @@
       ctx.font = canvasFont(30, "Georgia, serif", "bold");
       wrapCanvasText(ctx, "11  +  JULI  +  1823  +  GEORG IV.  +  FLECKEN LEER  +  RECHTE EINER STADT", 110, bottomY + 92, 1350, 42, 2);
 
-      // Vollständiger Abschlussbereich – bewusst mit genügend Abstand zum unteren Rand.
-      const finalY = bottomY + 215;
-      ctx.fillStyle = "rgba(255,250,238,.72)";
-      roundRectPath(ctx, 82, finalY, 1436, 445, 22);
-      ctx.fill();
-      ctx.strokeStyle = "rgba(97,76,47,.36)";
-      ctx.lineWidth = 2;
-      ctx.stroke();
-
+      const finalY = bottomY + 220;
+      drawFramedPhoto(ctx, finalImage, 1045, finalY, 425, 275);
       ctx.textAlign = "left";
-      ctx.fillStyle = "#7b2833";
-      ctx.font = canvasFont(34, "Georgia, serif", "bold");
-      ctx.fillText("✓  6 Spuren verfolgt", 120, finalY + 76);
-      ctx.fillText("✓  6 Beweise gesichert", 120, finalY + 132);
-      ctx.fillText("✓  Fall gelöst", 120, finalY + 188);
-
-      ctx.fillStyle = "#28342f";
-      ctx.font = canvasFont(27, "Georgia, serif", "bold");
-      wrapCanvasText(ctx, "Am 11. Juli 1823 verlieh König Georg IV. dem Flecken Leer die Rechte einer Stadt.", 120, finalY + 260, 790, 40, 3);
-
-      drawFramedPhoto(ctx, finalImage, 1045, finalY + 55, 425, 275);
       ctx.fillStyle = "#173f35";
       ctx.font = canvasFont(44, '"Brush Script MT", "Segoe Script", cursive', "normal", "italic");
-      ctx.fillText(crewName, 1060, finalY + 385);
+      ctx.fillText(crewName, 1060, finalY + 330);
+
+      ctx.fillStyle = "#7b2833";
+      ctx.font = canvasFont(38, "Georgia, serif", "bold");
+      ctx.fillText("6 Spuren verfolgt", 110, finalY + 55);
+      ctx.fillText("6 Beweise gesichert", 110, finalY + 110);
+      ctx.fillText("Fall gelöst!", 110, finalY + 165);
+      ctx.fillStyle = "#28342f";
+      ctx.font = canvasFont(27, "Georgia, serif", "bold");
+      wrapCanvasText(ctx, "Am 11. Juli 1823 verlieh König Georg IV. dem Flecken Leer die Rechte einer Stadt.", 110, finalY + 235, 820, 40, 3);
 
       const blob = await canvasToBlob(canvas, "image/png");
       showGeneratedMemory("Ermittlungskarte – Akte 1823", blob, `Akte-1823-Ermittlungskarte-${safeFileName(crewName)}.png`, "image");
@@ -2514,6 +3060,7 @@
     if (!state.user) initSupabase();
   });
   window.addEventListener("offline", () => setConnection("Offline", "offline"));
+  window.addEventListener("pagehide", () => stopCompass(false));
 
   window.addEventListener("load", () => {
     if ("serviceWorker" in navigator) {

@@ -2,9 +2,9 @@ const CACHE_NAME = "akte1823-v14";
 const APP_SHELL = [
   "./",
   "./index.html",
-  "./styles.css?v=3.1.1",
-  "./app.js?v=3.1.1",
-  "./config.js?v=3.1.1",
+  "./styles.css?v=3.2.0",
+  "./app.js?v=3.2.0",
+  "./config.js?v=3.2.0",
   "./manifest.webmanifest",
   "./assets/icon.svg"
 ];
