@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#173f35">
+  <title>Akte 1823 – alte App entfernen</title>
+  <style>
+    body{margin:0;min-height:100vh;display:grid;place-items:center;padding:24px;box-sizing:border-box;background:#173f35;color:#f7f1e6;font-family:system-ui,sans-serif;text-align:center}
+    main{max-width:34rem}h1{font-family:Georgia,serif}p{line-height:1.5}
+  </style>
+</head>
+<body>
+  <main>
+    <h1>Akte 1823</h1>
+    <p id="status">Alte zwischengespeicherte App wird entfernt …</p>
+  </main>
+  <script>
+    (async () => {
+      const status = document.getElementById("status");
+      try {
+        const thisAppScope = new URL("./", location.href).href;
+        if ("serviceWorker" in navigator) {
+          const registrations = await navigator.serviceWorker.getRegistrations();
+          const ownRegistrations = registrations.filter((registration) => registration.scope === thisAppScope);
+          await Promise.all(ownRegistrations.map((registration) => registration.unregister()));
+        }
+        if ("caches" in window) {
+          const keys = await caches.keys();
+          const ownCaches = keys.filter((key) => /^akte1823-/i.test(key));
+          await Promise.all(ownCaches.map((key) => caches.delete(key)));
+        }
+        status.textContent = "Bereinigt. Die richtige Stadtspiel-App wird jetzt geöffnet …";
+      } catch (error) {
+        console.warn(error);
+        status.textContent = "Die Bereinigung war nicht vollständig. Die App wird trotzdem neu geladen …";
+      }
+      setTimeout(() => location.replace("./?fresh=" + Date.now()), 500);
+    })();
+  </script>
+</body>
+</html>
