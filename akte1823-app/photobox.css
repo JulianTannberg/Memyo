@@ -1,4 +1,6 @@
 body.akte-photobox-open { overflow: hidden; }
+/* Wichtig auf Mobilgeräten: author-CSS darf das native [hidden] nicht überschreiben. */
+.akte-photo-booth [hidden] { display: none !important; }
 .akte-photo-booth {
   position: fixed;
   inset: 0;
@@ -8,6 +10,10 @@ body.akte-photobox-open { overflow: hidden; }
   padding: max(10px, env(safe-area-inset-top)) 10px max(10px, env(safe-area-inset-bottom));
   background: #0d241f;
   color: #f7f1e6;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  touch-action: pan-y;
 }
 .akte-photo-shell {
   position: relative;
@@ -32,8 +38,11 @@ body.akte-photobox-open { overflow: hidden; }
 }
 .akte-photo-card {
   width: min(660px, 94vw);
-  max-height: 94vh;
-  overflow: auto;
+  max-height: calc(100dvh - 24px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  touch-action: pan-y;
   padding: clamp(25px, 5vw, 48px);
   border: 2px solid #b08a45;
   border-radius: 24px;
@@ -210,7 +219,17 @@ body.akte-photobox-open { overflow: hidden; }
   background: #173f35;
 }
 .akte-photo-result-frame img { width: 100%; display: block; aspect-ratio: 4 / 3; object-fit: contain; }
-.akte-photo-result-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.akte-photo-result-actions {
+  position: sticky;
+  z-index: 6;
+  bottom: 0;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin: 12px -4px -4px;
+  padding: 12px 4px 4px;
+  background: linear-gradient(180deg, rgba(243,234,216,0), #f3ead8 28%);
+}
 
 @media (max-width: 620px) {
   .akte-photo-booth { padding-inline: 8px; }
@@ -221,5 +240,6 @@ body.akte-photobox-open { overflow: hidden; }
   .akte-photo-shutter { width: 80px; height: 80px; }
   .akte-photo-shutter span { width: 59px; height: 59px; }
   .akte-photo-round { width: 50px; height: 50px; }
+  .akte-photo-result-frame img { max-height: 48dvh; }
   .akte-photo-result-actions { grid-template-columns: 1fr; }
 }

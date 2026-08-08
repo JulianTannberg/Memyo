@@ -1,14 +1,14 @@
-const CACHE_NAME = "akte1823-v330-clean";
+const CACHE_NAME = "akte1823-v331-scrollfix";
 const APP_SHELL = [
   "./",
   "./index.html",
-  "./styles.css?v=3.3.0",
-  "./photobox.css?v=3.3.0",
-  "./app.js?v=3.3.0",
-  "./photobox.js?v=3.3.0",
-  "./config.js?v=3.3.0",
-  "./manifest.webmanifest?v=3.3.0",
-  "./icon.svg?v=3.3.0"
+  "./styles.css?v=3.3.1",
+  "./photobox.css?v=3.3.1",
+  "./app.js?v=3.3.1",
+  "./photobox.js?v=3.3.1",
+  "./config.js?v=3.3.1",
+  "./manifest.webmanifest?v=3.3.1",
+  "./icon.svg?v=3.3.1"
 ];
 
 self.addEventListener("install", (event) => {
