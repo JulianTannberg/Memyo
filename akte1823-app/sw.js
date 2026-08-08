@@ -1,14 +1,14 @@
-const CACHE_NAME = "akte1823-v331-scrollfix";
+const CACHE_NAME = "akte1823-v332-finalphoto-countdown-slideshow";
 const APP_SHELL = [
   "./",
   "./index.html",
-  "./styles.css?v=3.3.1",
-  "./photobox.css?v=3.3.1",
-  "./app.js?v=3.3.1",
-  "./photobox.js?v=3.3.1",
-  "./config.js?v=3.3.1",
-  "./manifest.webmanifest?v=3.3.1",
-  "./icon.svg?v=3.3.1"
+  "./styles.css?v=3.3.2",
+  "./photobox.css?v=3.3.2",
+  "./app.js?v=3.3.2",
+  "./photobox.js?v=3.3.2",
+  "./config.js?v=3.3.2",
+  "./manifest.webmanifest?v=3.3.2",
+  "./icon.svg?v=3.3.2"
 ];
 
 self.addEventListener("install", (event) => {

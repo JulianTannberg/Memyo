@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const APP_VERSION = "3.3.0";
+  const APP_VERSION = "3.3.2";
   const STORAGE_KEY = "akte1823.game";
   const SNAPSHOT_KEY = "akte1823.game.snapshot";
   const RECENT_GAMES_KEY = "akte1823.recentGames";
@@ -2444,6 +2444,42 @@
     return slides;
   }
 
+  function drawSlideshowTitle(ctx, text, centerX, y, maxWidth, final = false) {
+    const words = String(text || "").split(/\s+/).filter(Boolean);
+    const maxLines = 2;
+    const startSize = final ? 58 : 42;
+    const minSize = final ? 40 : 28;
+
+    for (let size = startSize; size >= minSize; size -= 2) {
+      ctx.font = canvasFont(size, "Georgia, serif", "bold");
+      const lines = [];
+      let line = "";
+      for (const word of words) {
+        const test = line ? `${line} ${word}` : word;
+        if (ctx.measureText(test).width > maxWidth && line) {
+          lines.push(line);
+          line = word;
+        } else {
+          line = test;
+        }
+      }
+      if (line) lines.push(line);
+      if (lines.length <= maxLines && lines.every((item) => ctx.measureText(item).width <= maxWidth)) {
+        const lineHeight = Math.round(size * 1.12);
+        lines.forEach((item, index) => ctx.fillText(item, centerX, y + index * lineHeight));
+        return y + (lines.length - 1) * lineHeight;
+      }
+    }
+
+    ctx.font = canvasFont(minSize, "Georgia, serif", "bold");
+    const first = words.slice(0, Math.ceil(words.length / 2)).join(" ");
+    let second = words.slice(Math.ceil(words.length / 2)).join(" ");
+    while (second && ctx.measureText(`${second}…`).width > maxWidth) second = second.slice(0, -1).trimEnd();
+    ctx.fillText(first, centerX, y);
+    if (second) ctx.fillText(`${second}…`, centerX, y + Math.round(minSize * 1.12));
+    return y + Math.round(minSize * 1.12);
+  }
+
   function drawSlideshowSlide(ctx, canvas, slide, progress = 1) {
     drawParchment(ctx, canvas.width, canvas.height);
     ctx.save();
@@ -2457,15 +2493,19 @@
 
     drawFramedPhoto(ctx, slide.image, 72, 205, 576, 650);
     ctx.fillStyle = slide.final ? "#7b2833" : "#173f35";
-    ctx.font = canvasFont(slide.final ? 58 : 42, "Georgia, serif", "bold");
-    ctx.fillText(slide.title, canvas.width / 2, 950);
+    const titleBottom = drawSlideshowTitle(ctx, slide.title, canvas.width / 2, 930, 600, Boolean(slide.final));
+
     ctx.fillStyle = "#7b2833";
-    ctx.font = canvasFont(42, '"Brush Script MT", "Segoe Script", cursive', "bold", "italic");
-    wrapCanvasText(ctx, slide.subtitle, canvas.width / 2, 1010, 600, 48, 2);
+    ctx.font = canvasFont(40, '"Brush Script MT", "Segoe Script", cursive', "bold", "italic");
+    ctx.textAlign = "center";
+    const subtitleY = titleBottom + 58;
+    wrapCenteredCanvasText(ctx, slide.subtitle, canvas.width / 2, subtitleY, 590, 45, 2);
+
     ctx.fillStyle = "#37443e";
     ctx.font = canvasFont(27, "Georgia, serif");
     ctx.textAlign = "center";
-    wrapCenteredCanvasText(ctx, slide.note, canvas.width / 2, 1115, 600, 38, 4);
+    const noteY = Math.max(1130, subtitleY + 95);
+    wrapCenteredCanvasText(ctx, slide.note, canvas.width / 2, noteY, 600, 38, 4);
     ctx.restore();
   }
 

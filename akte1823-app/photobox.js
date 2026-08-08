@@ -142,7 +142,7 @@
             <button id="aktePhotoShoot" class="akte-photo-shutter" type="button" aria-label="Foto aufnehmen"><span></span></button>
             <button id="aktePhotoCancel" class="akte-photo-round" type="button" aria-label="Abbrechen">×</button>
           </div>
-          <p class="akte-photo-help">3 · 2 · 1 – das passende Akte-1823-Overlay wird automatisch ins Foto gesetzt.</p>
+          <p class="akte-photo-help">10 Sekunden Vorlauf – das passende Akte-1823-Overlay wird automatisch ins Foto gesetzt.</p>
         </section>
 
         <section id="aktePhotoResultStage" class="akte-photo-card akte-photo-result" hidden>
@@ -234,15 +234,15 @@
     if (shoot) shoot.disabled = true;
     if (switcher) switcher.disabled = true;
     try {
-      for (const n of [3, 2, 1]) {
+      for (let n = 10; n >= 1; n -= 1) {
         if (countdown) countdown.textContent = String(n);
-        await wait(720);
+        await wait(1000);
       }
       if (countdown) {
         countdown.textContent = "Bitte lächeln!";
         countdown.classList.add("smile");
       }
-      await wait(1100);
+      await wait(700);
       await capture();
     } catch (error) {
       console.error(error);
