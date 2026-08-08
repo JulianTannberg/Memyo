@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const APP_VERSION = "3.3.2";
+  const APP_VERSION = "3.3.3";
   const STORAGE_KEY = "akte1823.game";
   const SNAPSHOT_KEY = "akte1823.game.snapshot";
   const RECENT_GAMES_KEY = "akte1823.recentGames";
@@ -2151,33 +2151,25 @@
       ctx.font = canvasFont(78, '"Brush Script MT", "Segoe Script", cursive', "normal", "italic");
       ctx.fillText(crewName, 620, 455);
 
-      drawFramedPhoto(ctx, image, 165, 520, 910, 520);
+      // Das Abschlussfoto wird von der Fotobox bereits als 4:3-Bild gespeichert.
+      // Der Urkundenrahmen ist deshalb ebenfalls 4:3, damit oben und unten nichts mehr abgeschnitten wird.
+      drawFramedPhoto(ctx, image, 165, 520, 910, 683);
 
       ctx.fillStyle = "#173f35";
       ctx.font = canvasFont(30, "Georgia, serif", "bold");
-      ctx.fillText("6 Spuren verfolgt  •  6 Beweise gesichert  •  Fall gelöst", 620, 1105);
+      ctx.fillText("6 Spuren verfolgt  •  6 Beweise gesichert  •  Fall gelöst", 620, 1260);
 
-      ctx.fillStyle = "rgba(255,255,255,.35)";
-      roundRectPath(ctx, 145, 1160, 950, 250, 26);
-      ctx.fill();
-      ctx.strokeStyle = "rgba(23,63,53,.45)";
-      ctx.lineWidth = 3;
-      ctx.stroke();
-      ctx.fillStyle = "#6f222d";
-      ctx.font = canvasFont(38, "Georgia, serif", "bold");
-      ctx.fillText("Am 11. Juli 1823 verlieh", 620, 1230);
-      ctx.fillText("König Georg IV. dem Flecken Leer", 620, 1285);
-      ctx.fillText("die Rechte einer Stadt.", 620, 1340);
-
+      // Die zusätzliche historische Textbox entfällt bewusst.
+      // Dadurch bekommt das Abschlussfoto mehr Platz und die Urkunde wirkt ruhiger.
       ctx.textAlign = "left";
       ctx.fillStyle = "#3b403d";
       ctx.font = canvasFont(24, "Georgia, serif");
-      ctx.fillText("Datum", 165, 1500);
+      ctx.fillText("Datum", 165, 1485);
       ctx.font = canvasFont(31, '"Brush Script MT", "Segoe Script", cursive', "normal", "italic");
-      ctx.fillText(dateLabel(), 165, 1543);
+      ctx.fillText(dateLabel(), 165, 1528);
 
       ctx.save();
-      ctx.translate(620, 1515);
+      ctx.translate(620, 1505);
       ctx.fillStyle = "#7b2833";
       ctx.strokeStyle = "#5b1721";
       ctx.lineWidth = 8;
@@ -2207,7 +2199,7 @@
       ctx.textAlign = "right";
       ctx.fillStyle = "rgba(76,67,54,.62)";
       ctx.font = canvasFont(25, "Georgia, serif", "bold");
-      ctx.fillText("ARCHIV 1823 · LEER", 1065, 1540);
+      ctx.fillText("ARCHIV 1823 · LEER", 1065, 1525);
 
       const blob = await canvasToBlob(canvas, "image/png");
       showGeneratedMemory("Urkunde – Akte 1823", blob, `Akte-1823-Urkunde-${safeFileName(crewName)}.png`, "image");

@@ -1,20 +1,14 @@
-AKTE 1823 – SAUBERER NEUAUFBAU v3.3.0
+AKTE 1823 – Update v3.3.3
 
-1. In GitHub den Ordner akte1823-app neu anlegen bzw. beim Upload als Ziel verwenden.
-2. ALLE Dateien aus diesem Paket direkt in akte1823-app hochladen.
-   Bitte keine zusätzliche Unterordner-Ebene anlegen.
-3. Commit abwarten, bis GitHub Pages die neue Fassung ausgeliefert hat.
-4. Danach EINMAL öffnen:
-   https://memyo.de/akte1823-app/reset.html
-   Diese Seite entfernt alte Service Worker und Browser-Caches und öffnet anschließend die App neu.
-5. Danach normal verwenden:
-   https://memyo.de/akte1823-app/
+Für dieses Update reichen 3 Dateien:
+- app.js
+- index.html
+- sw.js
 
-Enthaltene Änderungen:
-- richtige Akte-1823-Stadtspiel-App statt Chaos-Crew-Fotobox
-- integrierte Stadtspiel-Fotobox mit Akte-1823-Overlay
-- Kompass aus der sichtbaren App entfernt; Karten-Navigation bleibt
-- Spielcode zu Beginn offen sichtbar, danach nur über „Spielcode anzeigen“
-- Urkunden-Siegel verbessert
-- Ermittlungskarte unten vergrößert, damit der Abschlussbereich nicht abgeschnitten wird
-- neue Cache-Version + reset.html gegen alte Fotobox-Caches
+Änderungen:
+- Abschlussfoto auf der Urkunde jetzt im 4:3-Rahmen: kein Abschneiden oben/unten mehr.
+- Historische Textbox unter dem Foto entfernt.
+- Foto erhält deutlich mehr Platz; Statuszeile, Datum und Siegel wurden neu positioniert.
+- Cache-Version erhöht.
+
+Die übrigen Dateien aus v3.3.2 bleiben unverändert.
