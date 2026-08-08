@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const APP_VERSION = "3.3.3";
+  const APP_VERSION = "3.3.4";
   const STORAGE_KEY = "akte1823.game";
   const SNAPSHOT_KEY = "akte1823.game.snapshot";
   const RECENT_GAMES_KEY = "akte1823.recentGames";
@@ -2483,9 +2483,30 @@
     ctx.font = canvasFont(38, "Georgia, serif", "bold");
     ctx.fillText("AKTE 1823 · LEER", canvas.width / 2, 75);
 
+    if (slide.final) {
+      // Das Abschlussfoto ist 4:3 und enthält bereits das Akte-1823-Overlay.
+      // Deshalb wird es im Finale ebenfalls in 4:3 gezeigt: kein Abschneiden
+      // und keine doppelte, gequetschte Gestaltung mehr.
+      drawFramedPhoto(ctx, slide.image, 72, 205, 576, 432);
+
+      ctx.fillStyle = "#7b2833";
+      ctx.font = canvasFont(60, "Georgia, serif", "bold");
+      ctx.fillText("FALL GELÖST", canvas.width / 2, 760);
+
+      ctx.fillStyle = "#7b2833";
+      ctx.font = canvasFont(44, '"Brush Script MT", "Segoe Script", cursive', "bold", "italic");
+      wrapCenteredCanvasText(ctx, slide.subtitle, canvas.width / 2, 830, 590, 50, 2);
+
+      ctx.fillStyle = "#37443e";
+      ctx.font = canvasFont(28, "Georgia, serif");
+      wrapCenteredCanvasText(ctx, slide.note, canvas.width / 2, 965, 590, 42, 4);
+      ctx.restore();
+      return;
+    }
+
     drawFramedPhoto(ctx, slide.image, 72, 205, 576, 650);
-    ctx.fillStyle = slide.final ? "#7b2833" : "#173f35";
-    const titleBottom = drawSlideshowTitle(ctx, slide.title, canvas.width / 2, 930, 600, Boolean(slide.final));
+    ctx.fillStyle = "#173f35";
+    const titleBottom = drawSlideshowTitle(ctx, slide.title, canvas.width / 2, 930, 600, false);
 
     ctx.fillStyle = "#7b2833";
     ctx.font = canvasFont(40, '"Brush Script MT", "Segoe Script", cursive', "bold", "italic");

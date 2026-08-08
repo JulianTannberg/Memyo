@@ -1,14 +1,14 @@
-const CACHE_NAME = "akte1823-v333-certificate-photo-fit";
+const CACHE_NAME = "akte1823-v334-final-slideshow-layout";
 const APP_SHELL = [
   "./",
   "./index.html",
-  "./styles.css?v=3.3.3",
-  "./photobox.css?v=3.3.3",
-  "./app.js?v=3.3.3",
-  "./photobox.js?v=3.3.3",
-  "./config.js?v=3.3.3",
-  "./manifest.webmanifest?v=3.3.3",
-  "./icon.svg?v=3.3.3"
+  "./styles.css?v=3.3.4",
+  "./photobox.css?v=3.3.4",
+  "./app.js?v=3.3.4",
+  "./photobox.js?v=3.3.4",
+  "./config.js?v=3.3.4",
+  "./manifest.webmanifest?v=3.3.4",
+  "./icon.svg?v=3.3.4"
 ];
 
 self.addEventListener("install", (event) => {
